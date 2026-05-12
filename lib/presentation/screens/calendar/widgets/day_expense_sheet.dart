@@ -1,0 +1,107 @@
+import 'package:flutter/material.dart';
+import '../../../../../core/constants/app_spacing.dart';
+import '../../../../../core/utils/currency_formatter.dart';
+import '../../../../../core/utils/date_utils.dart' as utils;
+import '../../../../data/models/expense_model.dart';
+
+class DayExpenseSheet extends StatelessWidget {
+  final DateTime day;
+  final List<ExpenseModel> expenses;
+
+  const DayExpenseSheet({
+    super.key,
+    required this.day,
+    required this.expenses,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    utils.DateUtils.formatDisplayDate(day),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Total: ${CurrencyFormatter.format(total)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: expenses.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No expenses for this day',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: expenses.length,
+                      itemBuilder: (context, index) {
+                        final expense = expenses[index];
+                        return ListTile(
+                          title: Text(expense.name),
+                          trailing: Text(
+                            CurrencyFormatter.format(expense.amount),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

@@ -1,0 +1,34 @@
+class AppStrings {
+  static const String appName = 'Expense Tracker';
+  static const String dashboard = 'Dashboard';
+  static const String calendar = 'Calendar';
+  static const String expenses = 'Expenses';
+  static const String settings = 'Settings';
+  static const String addExpense = 'Add Expense';
+  static const String editExpense = 'Edit Expense';
+  static const String expenseName = 'Expense Name';
+  static const String amount = 'Amount';
+  static const String date = 'Date';
+  static const String category = 'Category';
+  static const String save = 'Save';
+  static const String cancel = 'Cancel';
+  static const String delete = 'Delete';
+  static const String edit = 'Edit';
+  static const String monthlySalary = 'Monthly Salary';
+  static const String previousBalance = 'Previous Month Balance';
+  static const String availableBalance = 'Available Balance';
+  static const String totalExpenses = 'Total Expenses';
+  static const String remainingBalance = 'Remaining Balance';
+  static const String enterName = 'Please enter expense name';
+  static const String enterAmount = 'Please enter a valid amount';
+  static const String noExpenses = 'No expenses yet';
+  static const String monthSummary = 'Month Summary';
+  static const String viewDetails = 'View Details';
+  static const String addCategory = 'Add Category';
+  static const String categoryName = 'Category Name';
+  static const String categoryEmoji = 'Emoji';
+  static const String lightMode = 'Light Mode';
+  static const String darkMode = 'Dark Mode';
+  static const String theme = 'Theme';
+  static const String recentExpenses = 'Recent Expenses';
+}
