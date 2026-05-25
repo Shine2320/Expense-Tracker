@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 import '../../../../../core/utils/date_utils.dart' as utils;
 import '../../../../data/models/expense_model.dart';
+import '../../../../presentation/providers/currency_provider.dart';
 
-class DayExpenseSheet extends StatelessWidget {
+class DayExpenseSheet extends ConsumerWidget {
   final DateTime day;
   final List<ExpenseModel> expenses;
 
@@ -15,7 +17,8 @@ class DayExpenseSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currency = ref.watch(currencyProvider);
     final total = expenses.fold<double>(0, (sum, e) => sum + e.amount);
 
     return DraggableScrollableSheet(
@@ -59,7 +62,7 @@ class DayExpenseSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Total: ${CurrencyFormatter.format(total)}',
+                      'Total: ${CurrencyFormatter.format(total, currency)}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -89,7 +92,7 @@ class DayExpenseSheet extends StatelessWidget {
                         return ListTile(
                           title: Text(expense.name),
                           trailing: Text(
-                            CurrencyFormatter.format(expense.amount),
+                            CurrencyFormatter.format(expense.amount, currency),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Theme.of(context).colorScheme.error,

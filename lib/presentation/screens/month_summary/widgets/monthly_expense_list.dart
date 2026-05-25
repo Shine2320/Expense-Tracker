@@ -5,6 +5,7 @@ import '../../../../../core/utils/currency_formatter.dart';
 import '../../../../../core/utils/date_utils.dart' as utils;
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/category_model.dart';
+import '../../../../presentation/providers/currency_provider.dart';
 import '../../expenses/widgets/expense_item.dart';
 
 class MonthlyExpenseList extends ConsumerWidget {
@@ -19,6 +20,7 @@ class MonthlyExpenseList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currency = ref.watch(currencyProvider);
     final groupedByDate = <String, List<ExpenseModel>>{};
 
     for (final expense in expenses) {
@@ -79,7 +81,7 @@ class MonthlyExpenseList extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      CurrencyFormatter.format(dayTotal),
+                      CurrencyFormatter.format(dayTotal, currency),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -97,6 +99,7 @@ class MonthlyExpenseList extends ConsumerWidget {
                 return ExpenseItem(
                   expense: expense,
                   category: category,
+                  currency: currency,
                   onEdit: () {},
                   onDelete: () {},
                 );

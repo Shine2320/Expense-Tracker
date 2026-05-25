@@ -4,6 +4,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../providers/balance_provider.dart';
+import '../../../providers/currency_provider.dart';
+import '../../../widgets/common/income_dialogs.dart';
 
 class BalanceCard extends ConsumerWidget {
   final BalanceState balanceState;
@@ -14,6 +16,7 @@ class BalanceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final currency = ref.watch(currencyProvider);
 
     return Card(
       child: Padding(
@@ -23,23 +26,23 @@ class BalanceCard extends ConsumerWidget {
           children: [
             _BalanceRow(
               label: 'Monthly Salary',
-              value: CurrencyFormatter.format(balanceState.currentMonth.salary),
+              value: CurrencyFormatter.format(balanceState.currentMonth.salary, currency),
               icon: Icons.account_balance_wallet_outlined,
               color: colorScheme.primary,
-              onTap: () => _editSalary(context, ref),
+              onTap: () => showEditSalaryDialog(context, ref),
             ),
             const Divider(height: 24),
             _BalanceRow(
               label: 'Previous Balance',
-              value: CurrencyFormatter.format(balanceState.currentMonth.carryOver),
+              value: CurrencyFormatter.format(balanceState.currentMonth.carryOver, currency),
               icon: Icons.history_outlined,
               color: colorScheme.secondary,
-              onTap: () => _editCarryOver(context, ref),
+              onTap: () => showEditCarryOverDialog(context, ref),
             ),
             const Divider(height: 24),
             _BalanceRow(
               label: 'Available Balance',
-              value: CurrencyFormatter.format(balanceState.availableBalance),
+              value: CurrencyFormatter.format(balanceState.availableBalance, currency),
               icon: Icons.savings_outlined,
               color: colorScheme.tertiary,
               isBold: true,
@@ -50,7 +53,7 @@ class BalanceCard extends ConsumerWidget {
                 Expanded(
                   child: _SummaryCard(
                     label: 'Total Expenses',
-                    value: CurrencyFormatter.format(balanceState.totalExpenses),
+                    value: CurrencyFormatter.format(balanceState.totalExpenses, currency),
                     color: const Color(AppColors.error),
                   ),
                 ),
@@ -58,7 +61,7 @@ class BalanceCard extends ConsumerWidget {
                 Expanded(
                   child: _SummaryCard(
                     label: 'Remaining',
-                    value: CurrencyFormatter.format(balanceState.remainingBalance),
+                    value: CurrencyFormatter.format(balanceState.remainingBalance, currency),
                     color: balanceState.remainingBalance >= 0
                         ? const Color(AppColors.success)
                         : const Color(AppColors.error),
@@ -72,79 +75,6 @@ class BalanceCard extends ConsumerWidget {
     );
   }
 
-  void _editSalary(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(
-      text: balanceState.currentMonth.salary.toStringAsFixed(2),
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Monthly Salary'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Salary',
-            prefixText: '₹',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final salary = double.tryParse(controller.text);
-              if (salary != null) {
-                ref.read(balanceProvider.notifier).updateSalary(salary);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editCarryOver(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(
-      text: balanceState.currentMonth.carryOver.toStringAsFixed(2),
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Previous Balance'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Carry-over Balance',
-            prefixText: '₹',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final carryOver = double.tryParse(controller.text);
-              if (carryOver != null) {
-                ref.read(balanceProvider.notifier).updateCarryOver(carryOver);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _BalanceRow extends StatelessWidget {

@@ -1,8 +1,9 @@
 import 'package:intl/intl.dart';
+import '../../data/models/currency_config.dart';
 
 class CurrencyFormatter {
-  static String format(double amount) {
-    return NumberFormat.currency(symbol: '₹', decimalDigits: 2, locale: 'en_IN').format(amount);
+  static String format(double amount, CurrencyConfig currency) {
+    return NumberFormat.currency(symbol: currency.symbol, decimalDigits: 2, locale: currency.locale).format(amount);
   }
 
   static String formatWithoutSymbol(double amount) {

@@ -5,6 +5,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../providers/expense_provider.dart';
+import '../../../providers/currency_provider.dart';
 
 class MonthlyChart extends ConsumerWidget {
   final DateTime month;
@@ -14,6 +15,7 @@ class MonthlyChart extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(expensesProvider);
+    final currency = ref.watch(currencyProvider);
     final expenses = ref.read(expensesProvider.notifier).getExpensesByMonth(month);
     final groupedByDay = <int, double>{};
 
@@ -57,7 +59,7 @@ class MonthlyChart extends ConsumerWidget {
                         final day = group.x.toInt() + 1;
                         final amount = groupedByDay[day] ?? 0;
                         return BarTooltipItem(
-                          'Day $day\n${CurrencyFormatter.format(amount)}',
+                          'Day $day\n${CurrencyFormatter.format(amount, currency)}',
                           TextStyle(
                             color: colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
@@ -94,7 +96,7 @@ class MonthlyChart extends ConsumerWidget {
                         getTitlesWidget: (value, meta) {
                           if (value == 0) return const SizedBox.shrink();
                           return Text(
-                            '₹${value.toInt()}',
+                            '${currency.symbol}${value.toInt()}',
                             style: TextStyle(
                               fontSize: 10,
                               color: colorScheme.onSurfaceVariant,

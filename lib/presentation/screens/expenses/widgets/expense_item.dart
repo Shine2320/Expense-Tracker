@@ -3,10 +3,12 @@ import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/category_model.dart';
+import '../../../../data/models/currency_config.dart';
 
 class ExpenseItem extends StatelessWidget {
   final ExpenseModel expense;
   final CategoryModel category;
+  final CurrencyConfig currency;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -14,6 +16,7 @@ class ExpenseItem extends StatelessWidget {
     super.key,
     required this.expense,
     required this.category,
+    required this.currency,
     required this.onEdit,
     required this.onDelete,
   });
@@ -59,7 +62,7 @@ class ExpenseItem extends StatelessWidget {
           ),
           subtitle: Text(category.name),
           trailing: Text(
-            CurrencyFormatter.format(expense.amount),
+            CurrencyFormatter.format(expense.amount, currency),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).colorScheme.error,

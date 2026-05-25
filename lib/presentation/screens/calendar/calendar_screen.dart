@@ -7,6 +7,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart' as utils;
 import '../../providers/calendar_provider.dart';
 import '../../providers/expense_provider.dart';
+import '../../providers/currency_provider.dart';
+import '../../../data/models/currency_config.dart';
 import 'widgets/day_expense_sheet.dart';
 
 class CalendarScreen extends ConsumerWidget {
@@ -16,6 +18,7 @@ class CalendarScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final focusedDay = ref.watch(calendarProvider);
     final expenseState = ref.watch(expensesProvider);
+    final currency = ref.watch(currencyProvider);
     final expensesForMonth = expenseState.expenses
         .where((e) =>
             e.date.year == focusedDay.year && e.date.month == focusedDay.month)
@@ -92,6 +95,7 @@ class CalendarScreen extends ConsumerWidget {
             child: _MonthSummary(
               month: focusedDay,
               daysWithExpenses: daysWithExpenses,
+              currency: currency,
             ),
           ),
         ],
@@ -115,10 +119,12 @@ class CalendarScreen extends ConsumerWidget {
 class _MonthSummary extends ConsumerWidget {
   final DateTime month;
   final Map<DateTime, List<dynamic>> daysWithExpenses;
+  final CurrencyConfig currency;
 
   const _MonthSummary({
     required this.month,
     required this.daysWithExpenses,
+    required this.currency,
   });
 
   @override
@@ -151,7 +157,7 @@ class _MonthSummary extends ConsumerWidget {
               Expanded(
                 child: _SummaryItem(
                   label: 'Total Expenses',
-                  value: CurrencyFormatter.format(totalMonthExpenses),
+                  value: CurrencyFormatter.format(totalMonthExpenses, currency),
                   color: Theme.of(context).colorScheme.error,
                 ),
               ),

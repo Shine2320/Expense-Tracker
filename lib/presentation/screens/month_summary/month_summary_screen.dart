@@ -7,6 +7,7 @@ import '../../../core/utils/date_utils.dart' as utils;
 import '../../providers/expense_provider.dart';
 import '../../providers/balance_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/currency_provider.dart';
 import 'widgets/summary_chart.dart';
 import 'widgets/monthly_expense_list.dart';
 
@@ -26,14 +27,16 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
   void initState() {
     super.initState();
     _selectedMonth = widget.month;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(expensesProvider.notifier).loadExpensesForMonth(_selectedMonth);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final balance = ref.watch(balanceProvider.notifier).getMonthBalance(_selectedMonth);
     final expenses = ref.watch(expensesProvider);
-
-    ref.read(expensesProvider.notifier).loadExpensesForMonth(_selectedMonth);
+    final currency = ref.watch(currencyProvider);
 
     final categoryExpenses = <String, double>{};
     for (final expense in expenses.expenses) {
@@ -99,25 +102,25 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                 children: [
                   _SummaryRow(
                     label: 'Salary',
-                    value: CurrencyFormatter.format(balance.salary),
+                    value: CurrencyFormatter.format(balance.salary, currency),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Carry-over',
-                    value: CurrencyFormatter.format(balance.carryOver),
+                    value: CurrencyFormatter.format(balance.carryOver, currency),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   const Divider(),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Total Expenses',
-                    value: CurrencyFormatter.format(balance.totalExpenses),
+                    value: CurrencyFormatter.format(balance.totalExpenses, currency),
                     valueColor: Theme.of(context).colorScheme.error,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Remaining',
-                    value: CurrencyFormatter.format(balance.remainingBalance),
+                    value: CurrencyFormatter.format(balance.remainingBalance, currency),
                     valueColor: balance.remainingBalance >= 0
                         ? Theme.of(context).colorScheme.primary
                         : Theme.of(context).colorScheme.error,

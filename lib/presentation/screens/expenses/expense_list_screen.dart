@@ -6,6 +6,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart' as utils;
 import '../../providers/expense_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../add_expense/add_expense_sheet.dart';
 import 'widgets/expense_item.dart';
 
@@ -16,6 +17,7 @@ class ExpenseListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expenseState = ref.watch(expensesProvider);
     final categories = ref.watch(categoryProvider).categories;
+    final currency = ref.watch(currencyProvider);
     final groupedExpenses = expenseState.groupedExpenses;
 
     return Scaffold(
@@ -71,7 +73,7 @@ class ExpenseListScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                'Total: ${CurrencyFormatter.format(dayTotal)}',
+                                'Total: ${CurrencyFormatter.format(dayTotal, currency)}',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -89,6 +91,7 @@ class ExpenseListScreen extends ConsumerWidget {
                           return ExpenseItem(
                             expense: expense,
                             category: category,
+                            currency: currency,
                             onEdit: () {
                               showModalBottomSheet(
                                 context: context,

@@ -4,6 +4,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../providers/category_provider.dart';
+import '../../../providers/currency_provider.dart';
 import 'category_selector.dart';
 
 class ExpenseForm extends ConsumerWidget {
@@ -34,6 +35,7 @@ class ExpenseForm extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoryState = ref.watch(categoryProvider);
     final categories = categoryState.categories;
+    final currency = ref.watch(currencyProvider);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -78,10 +80,10 @@ class ExpenseForm extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.amount,
-                prefixIcon: Icon(Icons.currency_rupee),
-                prefixText: '₹ ',
+                prefixIcon: Icon(currency.icon),
+                prefixText: '${currency.symbol} ',
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: (value) {

@@ -5,6 +5,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../providers/expense_provider.dart';
 import '../../../providers/category_provider.dart';
+import '../../../providers/currency_provider.dart';
 import '../../add_expense/add_expense_sheet.dart';
 
 class RecentExpensesList extends ConsumerWidget {
@@ -14,6 +15,7 @@ class RecentExpensesList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expenseState = ref.watch(expensesProvider);
     final categories = ref.watch(categoryProvider).categories;
+    final currency = ref.watch(currencyProvider);
     final recentExpenses = expenseState.expenses.take(5).toList();
 
     if (recentExpenses.isEmpty) {
@@ -76,7 +78,7 @@ class RecentExpensesList extends ConsumerWidget {
                     utils.DateUtils.formatDisplayDate(expense.date),
                   ),
                   trailing: Text(
-                    CurrencyFormatter.format(expense.amount),
+                    CurrencyFormatter.format(expense.amount, currency),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.error,

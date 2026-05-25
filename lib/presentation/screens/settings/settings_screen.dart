@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../data/models/currency_config.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/balance_provider.dart';
+import '../../providers/currency_provider.dart';
+import '../../widgets/common/income_dialogs.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +24,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isDark = themeMode == ThemeMode.system ? isSystemDark : themeMode == ThemeMode.dark;
     final categories = ref.watch(categoryProvider).categories;
     final balanceState = ref.watch(balanceProvider);
+    final currency = ref.watch(currencyProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -36,16 +40,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildIncomeTile(
                 context,
                 'Monthly Salary',
-                '₹${balanceState.currentMonth.salary.toStringAsFixed(2)}',
+                '${currency.symbol}${balanceState.currentMonth.salary.toStringAsFixed(2)}',
                 Icons.account_balance_wallet_outlined,
-                () => _editSalary(context, ref),
+                () => showEditSalaryDialog(context, ref),
               ),
               _buildIncomeTile(
                 context,
                 'Previous Month Balance',
-                '₹${balanceState.currentMonth.carryOver.toStringAsFixed(2)}',
+                '${currency.symbol}${balanceState.currentMonth.carryOver.toStringAsFixed(2)}',
                 Icons.history_outlined,
-                () => _editCarryOver(context, ref),
+                () => showEditCarryOverDialog(context, ref),
               ),
             ],
           ),
@@ -66,6 +70,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 title: const Text('Add Custom Category'),
                 onTap: () => _showAddCategoryDialog(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildSection(
+            context,
+            'Currency',
+            [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(currency.icon, color: Theme.of(context).colorScheme.primary),
+                ),
+                title: const Text('Currency'),
+                subtitle: Text('${currency.name} (${currency.symbol})'),
+                trailing: const Icon(Icons.arrow_drop_down),
+                onTap: () => _showCurrencyPicker(context, ref),
               ),
             ],
           ),
@@ -177,80 +202,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _editSalary(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(
-      text: ref.read(balanceProvider).currentMonth.salary.toStringAsFixed(2),
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Monthly Salary'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Salary',
-            prefixText: '₹',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final salary = double.tryParse(controller.text);
-              if (salary != null) {
-                ref.read(balanceProvider.notifier).updateSalary(salary);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editCarryOver(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(
-      text: ref.read(balanceProvider).currentMonth.carryOver.toStringAsFixed(2),
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Previous Month Balance'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Carry-over Balance',
-            prefixText: '₹',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final carryOver = double.tryParse(controller.text);
-              if (carryOver != null) {
-                ref.read(balanceProvider.notifier).updateCarryOver(carryOver);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showEditCategoryDialog(BuildContext context, WidgetRef ref, dynamic category) {
     final nameController = TextEditingController(text: category.name);
     final emojiController = TextEditingController(text: category.emoji);
@@ -306,6 +257,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
             child: const Text(AppStrings.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCurrencyPicker(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Currency'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: CurrencyConfig.supported.map((currency) {
+              return ListTile(
+                leading: Icon(currency.icon),
+                title: Text('${currency.name} (${currency.symbol})'),
+                subtitle: Text(currency.code),
+                trailing: ref.read(currencyProvider).code == currency.code
+                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    : null,
+                onTap: () {
+                  ref.read(currencyProvider.notifier).setCurrency(currency.code);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(AppStrings.cancel),
           ),
         ],
       ),
