@@ -38,8 +38,12 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
     final expenses = ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
 
+    final monthKey = utils.DateUtils.formatMonthKey(_selectedMonth);
+    final monthExpenses = expenses.expenses.where((e) =>
+      utils.DateUtils.formatMonthKey(e.date) == monthKey).toList();
+
     final categoryExpenses = <String, double>{};
-    for (final expense in expenses.expenses) {
+    for (final expense in monthExpenses) {
       categoryExpenses[expense.categoryId] =
           (categoryExpenses[expense.categoryId] ?? 0) + expense.amount;
     }
@@ -138,7 +142,7 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                 SummaryChart(categoryExpenses: categoryExpenses, categories: categories),
                 const SizedBox(height: AppSpacing.md),
                 MonthlyExpenseList(
-                  expenses: expenses.expenses,
+                  expenses: monthExpenses,
                   categories: categories,
                 ),
               ],

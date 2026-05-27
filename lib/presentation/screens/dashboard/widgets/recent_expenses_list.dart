@@ -43,12 +43,15 @@ class RecentExpensesList extends ConsumerWidget {
       );
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
       child: Column(
         children: [
           ...recentExpenses.asMap().entries.map((entry) {
             final index = entry.key;
             final expense = entry.value;
+            final isDeleted = expense.isDeleted;
             final category = categories.firstWhere(
               (c) => c.id == expense.categoryId,
               orElse: () => categories.firstWhere((c) => c.id == 'other'),
@@ -57,43 +60,79 @@ class RecentExpensesList extends ConsumerWidget {
             return Column(
               children: [
                 if (index > 0) const Divider(height: 1),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      category.emoji,
-                      style: const TextStyle(fontSize: 20),
-                    ),
-                  ),
-                  title: Text(
-                    expense.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    utils.DateUtils.formatDisplayDate(expense.date),
-                  ),
-                  trailing: Text(
-                    CurrencyFormatter.format(expense.amount, currency),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                Opacity(
+                  opacity: isDeleted ? 0.4 : 1.0,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      builder: (context) => AddExpenseSheet(expense: expense),
-                    );
-                  },
+                      child: Text(
+                        category.emoji,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                    ),
+                    title: Text(
+                      expense.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        decoration: isDeleted ? TextDecoration.lineThrough : null,
+                        color: isDeleted ? colorScheme.onSurface.withOpacity(0.4) : null,
+                      ),
+                    ),
+                    subtitle: Row(
+                      children: [
+                        if (isDeleted)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Deleted',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        Text(
+                          '${utils.DateUtils.formatDisplayDate(expense.date)} • ${utils.DateUtils.formatTime(expense.date)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Text(
+                      CurrencyFormatter.format(expense.amount, currency),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDeleted
+                            ? colorScheme.onSurface.withOpacity(0.3)
+                            : colorScheme.error,
+                        decoration: isDeleted ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                    onTap: isDeleted
+                        ? null
+                        : () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                              ),
+                              builder: (context) => AddExpenseSheet(expense: expense),
+                            );
+                          },
+                  ),
                 ),
               ],
             );

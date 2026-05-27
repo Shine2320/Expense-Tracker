@@ -5,6 +5,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_utils.dart' as utils;
 import '../../../providers/expense_provider.dart';
+import '../../../providers/balance_provider.dart';
 import '../../../providers/currency_provider.dart';
 
 class MonthlyChart extends ConsumerWidget {
@@ -16,6 +17,8 @@ class MonthlyChart extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
+    final balance = ref.watch(balanceProvider);
+    final totalSalary = balance.currentMonth.salary;
     final expenses = ref.read(expensesProvider.notifier).getExpensesByMonth(month);
     final groupedByDay = <int, double>{};
 
@@ -25,9 +28,8 @@ class MonthlyChart extends ConsumerWidget {
     }
 
     final daysInMonth = utils.DateUtils.endOfMonth(month).day;
-    final maxAmount = groupedByDay.values.isEmpty
-        ? 100.0
-        : groupedByDay.values.reduce((a, b) => a > b ? a : b);
+    final maxDailyExpense = groupedByDay.values.isEmpty ? 0.0 : groupedByDay.values.reduce((a, b) => a > b ? a : b);
+    final maxY = [maxDailyExpense * 1.2, totalSalary * 1.1].reduce((a, b) => a > b ? a : b).clamp(100, double.infinity).toDouble();
 
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -51,7 +53,7 @@ class MonthlyChart extends ConsumerWidget {
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
-                  maxY: maxAmount * 1.2,
+                  maxY: maxY,
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
@@ -115,13 +117,35 @@ class MonthlyChart extends ConsumerWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: maxAmount / 4,
+                    horizontalInterval: maxY / 4,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(
                         color: colorScheme.outlineVariant.withOpacity(0.3),
                         strokeWidth: 1,
                       );
                     },
+                  ),
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: totalSalary > 0
+                        ? [
+                            HorizontalLine(
+                              y: (totalSalary / daysInMonth).toDouble(),
+                              color: colorScheme.tertiary.withOpacity(0.6),
+                              strokeWidth: 1.5,
+                              dashArray: [6, 4],
+                              label: HorizontalLineLabel(
+                                show: true,
+                                alignment: Alignment.topRight,
+                                style: TextStyle(
+                                  color: colorScheme.tertiary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                labelResolver: (_) => 'Daily budget: ${currency.symbol}${(totalSalary / daysInMonth).toStringAsFixed(0)}',
+                              ),
+                            ),
+                          ]
+                        : [],
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: List.generate(daysInMonth, (index) {

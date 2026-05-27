@@ -23,13 +23,18 @@ class ExpenseModelAdapter extends TypeAdapter<ExpenseModel> {
       date: fields[3] as DateTime,
       categoryId: fields[4] as String,
       createdAt: fields[5] as DateTime,
+      paymentMethod: fields[6] == null ? 'cash' : fields[6] as String,
+      creditCardName: fields[7] as String?,
+      repaymentStatus: fields[8] == null ? 'none' : fields[8] as String,
+      repaymentDate: fields[9] as DateTime?,
+      isDeleted: fields[10] == null ? false : fields[10] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, ExpenseModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +46,17 @@ class ExpenseModelAdapter extends TypeAdapter<ExpenseModel> {
       ..writeByte(4)
       ..write(obj.categoryId)
       ..writeByte(5)
-      ..write(obj.createdAt);
+      ..write(obj.createdAt)
+      ..writeByte(6)
+      ..write(obj.paymentMethod)
+      ..writeByte(7)
+      ..write(obj.creditCardName)
+      ..writeByte(8)
+      ..write(obj.repaymentStatus)
+      ..writeByte(9)
+      ..write(obj.repaymentDate)
+      ..writeByte(10)
+      ..write(obj.isDeleted);
   }
 
   @override

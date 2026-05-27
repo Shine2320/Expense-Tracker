@@ -19,7 +19,8 @@ class DayExpenseSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = ref.watch(currencyProvider);
-    final total = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final nonDeleted = expenses.where((e) => !e.isDeleted).toList();
+    final total = nonDeleted.fold<double>(0, (sum, e) => sum + e.amount);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
@@ -90,12 +91,30 @@ class DayExpenseSheet extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final expense = expenses[index];
                         return ListTile(
-                          title: Text(expense.name),
+                          title: Text(
+                            expense.name,
+                            style: TextStyle(
+                              decoration: expense.isDeleted ? TextDecoration.lineThrough : null,
+                              color: expense.isDeleted
+                                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.4)
+                                  : null,
+                            ),
+                          ),
+                          subtitle: Text(
+                            utils.DateUtils.formatTime(expense.createdAt),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                           trailing: Text(
                             CurrencyFormatter.format(expense.amount, currency),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.error,
+                              color: expense.isDeleted
+                                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3)
+                                  : Theme.of(context).colorScheme.error,
+                              decoration: expense.isDeleted ? TextDecoration.lineThrough : null,
                             ),
                           ),
                         );

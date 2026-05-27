@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../data/models/currency_config.dart';
+import '../../../data/services/data_export_import.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/balance_provider.dart';
+import '../../providers/expense_provider.dart';
+import '../../providers/split_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/payer_name_provider.dart';
 import '../../widgets/common/income_dialogs.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -25,6 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final categories = ref.watch(categoryProvider).categories;
     final balanceState = ref.watch(balanceProvider);
     final currency = ref.watch(currencyProvider);
+    final payerName = ref.watch(payerNameProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -33,6 +38,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
+          _buildSection(
+            context,
+            'Profile',
+            [
+              _buildIncomeTile(
+                context,
+                'Your Name',
+                payerName.isNotEmpty ? payerName : 'Not set',
+                Icons.person_outline,
+                () => _showEditNameDialog(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
           _buildSection(
             context,
             'Income',
@@ -91,6 +110,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: Text('${currency.name} (${currency.symbol})'),
                 trailing: const Icon(Icons.arrow_drop_down),
                 onTap: () => _showCurrencyPicker(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildSection(
+            context,
+            'Data Management',
+            [
+              _buildActionTile(
+                context,
+                'Export to JSON',
+                'Save all data as JSON file',
+                Icons.file_download_outlined,
+                () => _exportData(context, ref, 'json'),
+              ),
+              _buildActionTile(
+                context,
+                'Export to Excel',
+                'Save all data as Excel (.xlsx) file',
+                Icons.table_chart_outlined,
+                () => _exportData(context, ref, 'xlsx'),
+              ),
+              _buildActionTile(
+                context,
+                'Import Data',
+                'Load data from JSON or Excel file',
+                Icons.file_upload_outlined,
+                () => _importData(context, ref),
               ),
             ],
           ),
@@ -355,5 +402,149 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  void _showEditNameDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController(text: ref.read(payerNameProvider));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Your Name'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Enter your name',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+          textCapitalization: TextCapitalization.words,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(AppStrings.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref.read(payerNameProvider.notifier).setPayerName(controller.text.trim());
+              Navigator.pop(context);
+            },
+            child: const Text(AppStrings.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Feature 1: Data Export/Import ──
+  Widget _buildActionTile(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      ),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _exportData(BuildContext context, WidgetRef ref, String format) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      String filePath;
+      if (format == 'json') {
+        filePath = await ExportImportData.exportToJson();
+      } else {
+        filePath = await ExportImportData.exportToExcel();
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Exported to $filePath'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _importData(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Import Data'),
+          content: const Text(
+            'This will replace all current data with the imported data. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(AppStrings.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Import'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+
+      final filePath = await ExportImportData.pickImportFile();
+      if (filePath == null) return;
+
+      if (filePath.endsWith('.json')) {
+        await ExportImportData.importFromJson(filePath);
+      } else if (filePath.endsWith('.xlsx')) {
+        await ExportImportData.importFromExcel(filePath);
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Unsupported file format'), behavior: SnackBarBehavior.floating),
+        );
+        return;
+      }
+
+      // Refresh all providers
+      ref.read(balanceProvider.notifier).loadBalance();
+      ref.read(expensesProvider.notifier).loadExpenses();
+      ref.read(categoryProvider.notifier).loadCategories();
+      ref.read(splitProvider.notifier).loadSplits();
+
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Data imported successfully'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Import failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

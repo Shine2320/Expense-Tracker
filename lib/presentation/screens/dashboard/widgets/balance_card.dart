@@ -9,8 +9,9 @@ import '../../../widgets/common/income_dialogs.dart';
 
 class BalanceCard extends ConsumerWidget {
   final BalanceState balanceState;
+  final double creditPending;
 
-  const BalanceCard({super.key, required this.balanceState});
+  const BalanceCard({super.key, required this.balanceState, this.creditPending = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,6 +49,15 @@ class BalanceCard extends ConsumerWidget {
               isBold: true,
             ),
             const SizedBox(height: AppSpacing.lg),
+            if (creditPending > 0) ...[
+              _BalanceRow(
+                label: 'Credit Expense Remaining',
+                value: CurrencyFormatter.format(creditPending, currency),
+                icon: Icons.credit_card_outlined,
+                color: colorScheme.error,
+              ),
+              const Divider(height: 24),
+            ],
             Row(
               children: [
                 Expanded(

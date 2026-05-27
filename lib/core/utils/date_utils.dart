@@ -21,6 +21,10 @@ class DateUtils {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  static String formatTime(DateTime date) {
+    return DateFormat('hh:mm a').format(date);
+  }
+
   static DateTime startOfMonth(DateTime date) {
     return DateTime(date.year, date.month, 1);
   }

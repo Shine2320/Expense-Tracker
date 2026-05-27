@@ -22,6 +22,21 @@ class ExpenseModel extends HiveObject {
   @HiveField(5)
   DateTime createdAt;
 
+  @HiveField(6, defaultValue: 'cash')
+  String paymentMethod;
+
+  @HiveField(7)
+  String? creditCardName;
+
+  @HiveField(8, defaultValue: 'none')
+  String repaymentStatus;
+
+  @HiveField(9)
+  DateTime? repaymentDate;
+
+  @HiveField(10, defaultValue: false)
+  bool isDeleted;
+
   ExpenseModel({
     required this.id,
     required this.name,
@@ -29,7 +44,16 @@ class ExpenseModel extends HiveObject {
     required this.date,
     required this.categoryId,
     required this.createdAt,
+    this.paymentMethod = 'cash',
+    this.creditCardName,
+    this.repaymentStatus = 'none',
+    this.repaymentDate,
+    this.isDeleted = false,
   });
+
+  bool get isCreditCard => paymentMethod == 'credit_card';
+  bool get isPending => repaymentStatus == 'pending';
+  bool get isPaid => repaymentStatus == 'paid';
 
   Map<String, dynamic> toMap() {
     return {
@@ -39,6 +63,11 @@ class ExpenseModel extends HiveObject {
       'date': date,
       'categoryId': categoryId,
       'createdAt': createdAt,
+      'paymentMethod': paymentMethod,
+      'creditCardName': creditCardName,
+      'repaymentStatus': repaymentStatus,
+      'repaymentDate': repaymentDate,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -50,6 +79,11 @@ class ExpenseModel extends HiveObject {
       date: map['date'] as DateTime,
       categoryId: map['categoryId'] as String,
       createdAt: map['createdAt'] as DateTime,
+      paymentMethod: map['paymentMethod'] as String? ?? 'cash',
+      creditCardName: map['creditCardName'] as String?,
+      repaymentStatus: map['repaymentStatus'] as String? ?? 'none',
+      repaymentDate: map['repaymentDate'] as DateTime?,
+      isDeleted: map['isDeleted'] as bool? ?? false,
     );
   }
 
@@ -58,6 +92,11 @@ class ExpenseModel extends HiveObject {
     double? amount,
     DateTime? date,
     String? categoryId,
+    String? paymentMethod,
+    String? creditCardName,
+    String? repaymentStatus,
+    DateTime? repaymentDate,
+    bool? isDeleted,
   }) {
     return ExpenseModel(
       id: id,
@@ -66,6 +105,11 @@ class ExpenseModel extends HiveObject {
       date: date ?? this.date,
       categoryId: categoryId ?? this.categoryId,
       createdAt: createdAt,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      creditCardName: creditCardName ?? this.creditCardName,
+      repaymentStatus: repaymentStatus ?? this.repaymentStatus,
+      repaymentDate: repaymentDate ?? this.repaymentDate,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

@@ -17,6 +17,10 @@ class ExpenseRepository {
     return expenses;
   }
 
+  ExpenseModel? getExpenseById(String id) {
+    return _box.get(id);
+  }
+
   List<ExpenseModel> getExpensesByDate(DateTime date) {
     return _box.values.where((e) => utils.DateUtils.isSameDay(e.date, date)).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -53,9 +57,16 @@ class ExpenseRepository {
       date: expense.date,
       categoryId: expense.categoryId,
       createdAt: DateTime.now(),
+      paymentMethod: expense.paymentMethod,
+      creditCardName: expense.creditCardName,
+      repaymentStatus: expense.repaymentStatus,
+      repaymentDate: expense.repaymentDate,
+      isDeleted: expense.isDeleted,
     );
     await _box.put(newExpense.id, newExpense);
-    _updateMonthlyExpenses(newExpense.date, newExpense.amount);
+    if (!newExpense.isCreditCard) {
+      _updateMonthlyExpenses(newExpense.date, newExpense.amount);
+    }
     return newExpense;
   }
 
@@ -63,9 +74,16 @@ class ExpenseRepository {
     final existing = _box.get(expense.id);
     if (existing == null) return Future.value();
 
-    _updateMonthlyExpenses(existing.date, -existing.amount);
+    final oldWasCounted = !existing.isCreditCard && !existing.isDeleted;
+    final newIsCounted = !expense.isCreditCard && !expense.isDeleted;
+
+    if (oldWasCounted) {
+      _updateMonthlyExpenses(existing.date, -existing.amount);
+    }
     _box.put(expense.id, expense);
-    _updateMonthlyExpenses(expense.date, expense.amount);
+    if (newIsCounted) {
+      _updateMonthlyExpenses(expense.date, expense.amount);
+    }
     return Future.value();
   }
 
@@ -73,8 +91,72 @@ class ExpenseRepository {
     final expense = _box.get(id);
     if (expense == null) return;
 
+    expense.isDeleted = true;
+    await expense.save();
+    if (!expense.isCreditCard || expense.isPaid) {
+      _updateMonthlyExpenses(expense.date, -expense.amount);
+    }
+  }
+
+  Future<void> permanentlyDeleteExpense(String id) async {
+    final expense = _box.get(id);
+    if (expense == null) return;
+
+    final wasPaidCredit = expense.isCreditCard && expense.isPaid;
     _box.delete(id);
+    if (!expense.isCreditCard || wasPaidCredit) {
+      _updateMonthlyExpenses(expense.date, -expense.amount);
+    }
+  }
+
+  Future<void> markAsPaid(String id) async {
+    final expense = _box.get(id);
+    if (expense == null) return;
+
+    expense.repaymentStatus = 'paid';
+    expense.repaymentDate = DateTime.now();
+    await expense.save();
+    _updateMonthlyExpenses(expense.date, expense.amount);
+  }
+
+  Future<void> markAsPaidWithAmount(String id, double netAmount) async {
+    final expense = _box.get(id);
+    if (expense == null) return;
+
+    expense.repaymentStatus = 'paid';
+    expense.repaymentDate = DateTime.now();
+    await expense.save();
+    _updateMonthlyExpenses(expense.date, netAmount);
+  }
+
+  Future<void> markAsUnpaid(String id) async {
+    final expense = _box.get(id);
+    if (expense == null) return;
+
+    expense.repaymentStatus = 'pending';
+    expense.repaymentDate = null;
+    await expense.save();
     _updateMonthlyExpenses(expense.date, -expense.amount);
+  }
+
+  Future<void> markAsUnpaidWithAmount(String id, double netAmount) async {
+    final expense = _box.get(id);
+    if (expense == null) return;
+
+    expense.repaymentStatus = 'pending';
+    expense.repaymentDate = null;
+    await expense.save();
+    _updateMonthlyExpenses(expense.date, -netAmount);
+  }
+
+  List<ExpenseModel> getActiveExpenses() {
+    return _box.values.where((e) => !e.isDeleted).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  List<ExpenseModel> getDeletedExpenses() {
+    return _box.values.where((e) => e.isDeleted).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
   }
 
   void _updateMonthlyExpenses(DateTime date, double amountChange) {
@@ -83,6 +165,10 @@ class ExpenseRepository {
 
     balance.totalExpenses = (balance.totalExpenses + amountChange).clamp(0, double.infinity);
     _balanceBox.put(monthKey, balance);
+  }
+
+  void adjustMonthlyExpenses(DateTime date, double amountChange) {
+    _updateMonthlyExpenses(date, amountChange);
   }
 
   double getTotalForMonth(DateTime date) {
