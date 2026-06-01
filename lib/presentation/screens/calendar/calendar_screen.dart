@@ -17,16 +17,15 @@ class CalendarScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final focusedDay = ref.watch(calendarProvider);
-    final expenseState = ref.watch(expensesProvider);
+    ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
-    final expensesForMonth = expenseState.expenses
-        .where((e) =>
-            e.date.year == focusedDay.year && e.date.month == focusedDay.month)
-        .toList();
+    final expensesForMonth =
+        ref.read(expensesProvider.notifier).getExpensesByMonth(focusedDay);
 
     final daysWithExpenses = <DateTime, List<dynamic>>{};
     for (final expense in expensesForMonth) {
-      final day = DateTime(expense.date.year, expense.date.month, expense.date.day);
+      final day =
+          DateTime(expense.date.year, expense.date.month, expense.date.day);
       if (!daysWithExpenses.containsKey(day)) {
         daysWithExpenses[day] = [];
       }
@@ -58,7 +57,9 @@ class CalendarScreen extends ConsumerWidget {
                 ref.read(calendarProvider.notifier).setFocusedDay(focusedDay);
               },
               eventLoader: (day) {
-                return daysWithExpenses[DateTime(day.year, day.month, day.day)] ?? [];
+                return daysWithExpenses[
+                        DateTime(day.year, day.month, day.day)] ??
+                    [];
               },
               calendarStyle: CalendarStyle(
                 markersMaxCount: 3,

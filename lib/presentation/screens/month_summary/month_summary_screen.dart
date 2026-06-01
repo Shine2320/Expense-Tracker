@@ -4,6 +4,8 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart' as utils;
+import '../../../data/models/category_model.dart';
+import '../../../data/models/currency_config.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/balance_provider.dart';
 import '../../providers/category_provider.dart';
@@ -34,13 +36,13 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final balance = ref.watch(balanceProvider.notifier).getMonthBalance(_selectedMonth);
-    final expenses = ref.watch(expensesProvider);
+    final balance =
+        ref.watch(balanceProvider.notifier).getMonthBalance(_selectedMonth);
+    ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
 
-    final monthKey = utils.DateUtils.formatMonthKey(_selectedMonth);
-    final monthExpenses = expenses.expenses.where((e) =>
-      utils.DateUtils.formatMonthKey(e.date) == monthKey).toList();
+    final monthExpenses =
+        ref.read(expensesProvider.notifier).getExpensesByMonth(_selectedMonth);
 
     final categoryExpenses = <String, double>{};
     for (final expense in monthExpenses) {
@@ -69,7 +71,9 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                         _selectedMonth.month - 1,
                       );
                     });
-                    ref.read(expensesProvider.notifier).loadExpensesForMonth(_selectedMonth);
+                    ref
+                        .read(expensesProvider.notifier)
+                        .loadExpensesForMonth(_selectedMonth);
                   },
                 ),
                 Expanded(
@@ -92,7 +96,9 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                         _selectedMonth.month + 1,
                       );
                     });
-                    ref.read(expensesProvider.notifier).loadExpensesForMonth(_selectedMonth);
+                    ref
+                        .read(expensesProvider.notifier)
+                        .loadExpensesForMonth(_selectedMonth);
                   },
                 ),
               ],
@@ -111,20 +117,23 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Carry-over',
-                    value: CurrencyFormatter.format(balance.carryOver, currency),
+                    value:
+                        CurrencyFormatter.format(balance.carryOver, currency),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   const Divider(),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Total Expenses',
-                    value: CurrencyFormatter.format(balance.totalExpenses, currency),
+                    value: CurrencyFormatter.format(
+                        balance.totalExpenses, currency),
                     valueColor: Theme.of(context).colorScheme.error,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Remaining',
-                    value: CurrencyFormatter.format(balance.remainingBalance, currency),
+                    value: CurrencyFormatter.format(
+                        balance.remainingBalance, currency),
                     valueColor: balance.remainingBalance >= 0
                         ? Theme.of(context).colorScheme.primary
                         : Theme.of(context).colorScheme.error,
@@ -139,7 +148,16 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               children: [
-                SummaryChart(categoryExpenses: categoryExpenses, categories: categories),
+                SummaryChart(
+                  categoryExpenses: categoryExpenses,
+                  categories: categories,
+                  onTap: () => _showCategoryBreakdown(
+                    context,
+                    categoryExpenses,
+                    categories,
+                    currency,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 MonthlyExpenseList(
                   expenses: monthExpenses,
@@ -149,6 +167,139 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showCategoryBreakdown(
+    BuildContext context,
+    Map<String, double> categoryExpenses,
+    List<CategoryModel> categories,
+    CurrencyConfig currency,
+  ) {
+    if (categoryExpenses.isEmpty) return;
+
+    final entries = categoryExpenses.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final total = entries.fold<double>(0, (sum, entry) => sum + entry.value);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.3,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Spend by Category',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        CurrencyFormatter.format(total, currency),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    itemCount: entries.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final category = _categoryFor(entry.key, categories);
+                      final percentage =
+                          total == 0 ? 0 : (entry.value / total * 100);
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            category.emoji,
+                            style: const TextStyle(fontSize: 22),
+                          ),
+                        ),
+                        title: Text(
+                          category.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${percentage.toStringAsFixed(1)}%',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                        trailing: Text(
+                          CurrencyFormatter.format(entry.value, currency),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.error,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  CategoryModel _categoryFor(
+      String categoryId, List<CategoryModel> categories) {
+    return categories.firstWhere(
+      (c) => c.id == categoryId,
+      orElse: () => categories.firstWhere(
+        (c) => c.id == 'other',
+        orElse: () => CategoryModel(
+          id: 'other',
+          name: 'Other',
+          emoji: '?',
+        ),
       ),
     );
   }

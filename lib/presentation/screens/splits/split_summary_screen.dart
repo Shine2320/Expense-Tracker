@@ -23,8 +23,8 @@ class SplitSummaryScreen extends ConsumerWidget {
     // Group all splits by ID for display
     final splitGroups = <ExpenseSplitModel, List<SplitParticipantModel>>{};
     for (final split in splitState.splits) {
-      final participants = ref.read(splitProvider.notifier)
-          .getParticipantsBySplitId(split.id);
+      final participants =
+          ref.read(splitProvider.notifier).getParticipantsBySplitId(split.id);
       if (participants.isNotEmpty) {
         splitGroups[split] = participants;
       }
@@ -39,7 +39,8 @@ class SplitSummaryScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.people_outline, size: 64, color: colorScheme.outline),
+                  Icon(Icons.people_outline,
+                      size: 64, color: colorScheme.outline),
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     'No split payments',
@@ -57,17 +58,28 @@ class SplitSummaryScreen extends ConsumerWidget {
                 final expense = expenseState.expenses.firstWhere(
                   (e) => e.id == split.expenseId,
                   orElse: () => ExpenseModel(
-                    id: '', name: 'Deleted expense', amount: 0,
-                    date: DateTime.now(), categoryId: '', createdAt: DateTime.now(),
+                    id: '',
+                    name: 'Deleted expense',
+                    amount: 0,
+                    date: DateTime.now(),
+                    categoryId: '',
+                    createdAt: DateTime.now(),
                   ),
                 );
                 final slipParticipant = participants.firstWhere(
                   (p) => p.isSlipPayer,
-                  orElse: () => SplitParticipantModel(id: '', splitId: '', name: '', amount: 0),
+                  orElse: () => SplitParticipantModel(
+                      id: '', splitId: '', name: '', amount: 0),
                 );
-                final nonSlipParticipants = participants.where((p) => !p.isSlipPayer).toList();
-                final pendingParticipants = nonSlipParticipants.where((p) => !p.isPaid).toList();
-                final paidParticipants = nonSlipParticipants.where((p) => p.isPaid).toList();
+                final nonSlipParticipants =
+                    participants.where((p) => !p.isSlipPayer).toList();
+                final pendingParticipants =
+                    nonSlipParticipants.where((p) => !p.isPaid).toList();
+                final paidParticipants =
+                    nonSlipParticipants.where((p) => p.isPaid).toList();
+                final shouldAdjustExpenseTotal = expense.id.isNotEmpty &&
+                    !expense.isDeleted &&
+                    (!expense.isCreditCard || expense.isPaid);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -89,7 +101,8 @@ class SplitSummaryScreen extends ConsumerWidget {
                         if (slipParticipant.name.isNotEmpty)
                           Row(
                             children: [
-                              Icon(Icons.person, size: 14, color: colorScheme.primary),
+                              Icon(Icons.person,
+                                  size: 14, color: colorScheme.primary),
                               const SizedBox(width: 4),
                               Text(
                                 '${slipParticipant.name} paid upfront',
@@ -107,7 +120,8 @@ class SplitSummaryScreen extends ConsumerWidget {
                           Text(
                             'Pending (${pendingParticipants.length})',
                             style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -118,7 +132,9 @@ class SplitSummaryScreen extends ConsumerWidget {
                               leading: CircleAvatar(
                                 backgroundColor: colorScheme.primaryContainer,
                                 child: Text(
-                                  participant.name.isNotEmpty ? participant.name[0].toUpperCase() : '?',
+                                  participant.name.isNotEmpty
+                                      ? participant.name[0].toUpperCase()
+                                      : '?',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onPrimaryContainer,
@@ -133,7 +149,8 @@ class SplitSummaryScreen extends ConsumerWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    CurrencyFormatter.format(participant.amount, currency),
+                                    CurrencyFormatter.format(
+                                        participant.amount, currency),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.error,
@@ -141,15 +158,22 @@ class SplitSummaryScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
                                   IconButton(
-                                    icon: Icon(Icons.check_circle_outline, color: colorScheme.primary),
+                                    icon: Icon(Icons.check_circle_outline,
+                                        color: colorScheme.primary),
                                     onPressed: () async {
-                                      await ref.read(splitProvider.notifier)
-                                          .markParticipantAsPaid(participant.id);
-                                      if (expense.isCreditCard && expense.isPaid) {
-                                        ref.read(expenseRepositoryProvider)
-                                            .adjustMonthlyExpenses(expense.date, -participant.amount);
+                                      await ref
+                                          .read(splitProvider.notifier)
+                                          .markParticipantAsPaid(
+                                              participant.id);
+                                      if (shouldAdjustExpenseTotal) {
+                                        ref
+                                            .read(expenseRepositoryProvider)
+                                            .adjustMonthlyExpenses(expense.date,
+                                                -participant.amount);
                                       }
-                                      ref.read(balanceProvider.notifier).loadBalance();
+                                      ref
+                                          .read(balanceProvider.notifier)
+                                          .loadBalance();
                                     },
                                     tooltip: 'Mark as Paid',
                                   ),
@@ -165,7 +189,8 @@ class SplitSummaryScreen extends ConsumerWidget {
                           Text(
                             'Paid (${paidParticipants.length})',
                             style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -175,11 +200,13 @@ class SplitSummaryScreen extends ConsumerWidget {
                               contentPadding: EdgeInsets.zero,
                               leading: CircleAvatar(
                                 backgroundColor: colorScheme.secondaryContainer,
-                                child: Icon(Icons.check, color: colorScheme.onSecondaryContainer),
+                                child: Icon(Icons.check,
+                                    color: colorScheme.onSecondaryContainer),
                               ),
                               title: Text(
                                 participant.name,
-                                style: const TextStyle(decoration: TextDecoration.lineThrough),
+                                style: const TextStyle(
+                                    decoration: TextDecoration.lineThrough),
                               ),
                               subtitle: slipParticipant.name.isNotEmpty
                                   ? Text('Paid back ${slipParticipant.name}')
@@ -188,24 +215,33 @@ class SplitSummaryScreen extends ConsumerWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    CurrencyFormatter.format(participant.amount, currency),
+                                    CurrencyFormatter.format(
+                                        participant.amount, currency),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface.withOpacity(0.3),
+                                      color: colorScheme.onSurface
+                                          .withOpacity(0.3),
                                       decoration: TextDecoration.lineThrough,
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
                                   IconButton(
-                                    icon: Icon(Icons.undo, color: colorScheme.onSurfaceVariant),
+                                    icon: Icon(Icons.undo,
+                                        color: colorScheme.onSurfaceVariant),
                                     onPressed: () async {
-                                      await ref.read(splitProvider.notifier)
-                                          .unmarkParticipantAsPaid(participant.id);
-                                      if (expense.isCreditCard && expense.isPaid) {
-                                        ref.read(expenseRepositoryProvider)
-                                            .adjustMonthlyExpenses(expense.date, participant.amount);
+                                      await ref
+                                          .read(splitProvider.notifier)
+                                          .unmarkParticipantAsPaid(
+                                              participant.id);
+                                      if (shouldAdjustExpenseTotal) {
+                                        ref
+                                            .read(expenseRepositoryProvider)
+                                            .adjustMonthlyExpenses(expense.date,
+                                                participant.amount);
                                       }
-                                      ref.read(balanceProvider.notifier).loadBalance();
+                                      ref
+                                          .read(balanceProvider.notifier)
+                                          .loadBalance();
                                     },
                                     tooltip: 'Undo Paid',
                                   ),

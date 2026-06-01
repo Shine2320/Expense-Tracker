@@ -19,8 +19,8 @@ class DayExpenseSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = ref.watch(currencyProvider);
-    final nonDeleted = expenses.where((e) => !e.isDeleted).toList();
-    final total = nonDeleted.fold<double>(0, (sum, e) => sum + e.amount);
+    final visibleExpenses = expenses.where((e) => !e.isDeleted).toList();
+    final total = visibleExpenses.fold<double>(0, (sum, e) => sum + e.amount);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
@@ -76,7 +76,7 @@ class DayExpenseSheet extends ConsumerWidget {
             ),
             const Divider(height: 1),
             Expanded(
-              child: expenses.isEmpty
+              child: visibleExpenses.isEmpty
                   ? Center(
                       child: Text(
                         'No expenses for this day',
@@ -87,16 +87,21 @@ class DayExpenseSheet extends ConsumerWidget {
                     )
                   : ListView.builder(
                       controller: scrollController,
-                      itemCount: expenses.length,
+                      itemCount: visibleExpenses.length,
                       itemBuilder: (context, index) {
-                        final expense = expenses[index];
+                        final expense = visibleExpenses[index];
                         return ListTile(
                           title: Text(
                             expense.name,
                             style: TextStyle(
-                              decoration: expense.isDeleted ? TextDecoration.lineThrough : null,
+                              decoration: expense.isDeleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                               color: expense.isDeleted
-                                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.4)
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.4)
                                   : null,
                             ),
                           ),
@@ -104,7 +109,9 @@ class DayExpenseSheet extends ConsumerWidget {
                             utils.DateUtils.formatTime(expense.createdAt),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                           trailing: Text(
@@ -112,9 +119,14 @@ class DayExpenseSheet extends ConsumerWidget {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: expense.isDeleted
-                                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3)
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.3)
                                   : Theme.of(context).colorScheme.error,
-                              decoration: expense.isDeleted ? TextDecoration.lineThrough : null,
+                              decoration: expense.isDeleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
                         );

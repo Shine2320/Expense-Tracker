@@ -9,7 +9,8 @@ final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
   return ExpenseRepository();
 });
 
-final expensesProvider = StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
+final expensesProvider =
+    StateNotifierProvider<ExpenseNotifier, ExpenseState>((ref) {
   return ExpenseNotifier(
     ref.watch(expenseRepositoryProvider),
     ref.watch(splitRepositoryProvider),
@@ -46,7 +47,8 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   final SplitRepository _splitRepository;
   final Function _onBalanceChanged;
 
-  ExpenseNotifier(this._repository, this._splitRepository, this._onBalanceChanged)
+  ExpenseNotifier(
+      this._repository, this._splitRepository, this._onBalanceChanged)
       : super(ExpenseState()) {
     loadExpenses();
   }
@@ -65,14 +67,8 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   void loadDeletedExpenses() {
     state = state.copyWith(isLoading: true);
     final expenses = _repository.getDeletedExpenses();
-    final grouped = _repository.getExpensesGroupedByDate(null);
-    final deletedGrouped = <String, List<ExpenseModel>>{};
-    for (final entry in grouped.entries) {
-      final deleted = entry.value.where((e) => e.isDeleted).toList();
-      if (deleted.isNotEmpty) {
-        deletedGrouped[entry.key] = deleted;
-      }
-    }
+    final deletedGrouped =
+        _repository.getExpensesGroupedByDate(null, deletedOnly: true);
     state = state.copyWith(
       expenses: expenses,
       groupedExpenses: deletedGrouped,
@@ -99,19 +95,33 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   Future<void> updateExpense(ExpenseModel expense) async {
-    await _repository.updateExpense(expense);
+    final existing = _repository.getExpenseById(expense.id);
+    await _repository.updateExpense(
+      expense,
+      oldCountedAmount:
+          existing == null ? null : _countedMonthlyAmount(existing),
+      newCountedAmount: _countedMonthlyAmount(expense),
+    );
     loadExpenses();
     _onBalanceChanged();
   }
 
   Future<void> deleteExpense(String id) async {
-    await _repository.deleteExpense(id);
+    final expense = _repository.getExpenseById(id);
+    await _repository.deleteExpense(
+      id,
+      countedAmount: expense == null ? null : _countedMonthlyAmount(expense),
+    );
     loadExpenses();
     _onBalanceChanged();
   }
 
   Future<void> permanentlyDeleteExpense(String id) async {
-    await _repository.permanentlyDeleteExpense(id);
+    final expense = _repository.getExpenseById(id);
+    await _repository.permanentlyDeleteExpense(
+      id,
+      countedAmount: expense == null ? null : _countedMonthlyAmount(expense),
+    );
     await _splitRepository.deleteSplitByExpenseId(id);
     loadExpenses();
     _onBalanceChanged();
@@ -119,69 +129,109 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
   Future<void> markAsPaid(String id) async {
     final expense = _repository.getExpenseById(id);
-    if (expense != null && expense.isCreditCard) {
-      // Check if this expense has a split with a slip person
-      final split = _splitRepository.getSplitByExpenseId(id);
-      if (split != null && split.slipPersonId != null) {
-        // Calculate net amount: total minus what participants already paid
-        final participants = _splitRepository.getParticipantsBySplitId(split.id);
-        double collectedFromOthers = 0;
-        for (final p in participants) {
-          if (!p.isSlipPayer && p.isPaid) {
-            collectedFromOthers += p.amount;
-          }
-        }
-        final netAmount = expense.amount - collectedFromOthers;
-        // Only add the net amount to monthly totals
-        await _repository.markAsPaidWithAmount(id, netAmount);
-        loadExpenses();
-        _onBalanceChanged();
-        return;
-      }
+    if (expense == null ||
+        expense.isDeleted ||
+        !expense.isCreditCard ||
+        expense.isPaid) {
+      return;
     }
-    await _repository.markAsPaid(id);
+    await _repository.markAsPaidWithAmount(id, _netSplitAmount(expense));
     loadExpenses();
     _onBalanceChanged();
   }
 
   Future<void> markAsUnpaid(String id) async {
     final expense = _repository.getExpenseById(id);
-    if (expense != null && expense.isCreditCard) {
-      final split = _splitRepository.getSplitByExpenseId(id);
-      if (split != null && split.slipPersonId != null) {
-        final participants = _splitRepository.getParticipantsBySplitId(split.id);
-        double collectedFromOthers = 0;
-        for (final p in participants) {
-          if (!p.isSlipPayer && p.isPaid) {
-            collectedFromOthers += p.amount;
-          }
-        }
-        final netAmount = expense.amount - collectedFromOthers;
-        await _repository.markAsUnpaidWithAmount(id, netAmount);
-        loadExpenses();
-        _onBalanceChanged();
-        return;
-      }
+    if (expense == null ||
+        expense.isDeleted ||
+        !expense.isCreditCard ||
+        !expense.isPaid) {
+      return;
     }
-    await _repository.markAsUnpaid(id);
+    await _repository.markAsUnpaidWithAmount(
+      id,
+      _countedMonthlyAmount(expense),
+    );
     loadExpenses();
     _onBalanceChanged();
   }
 
+  double _countedMonthlyAmount(ExpenseModel expense) {
+    if (expense.isDeleted || (expense.isCreditCard && !expense.isPaid)) {
+      return 0;
+    }
+    return _netSplitAmount(expense);
+  }
+
+  double _netSplitAmount(ExpenseModel expense) {
+    final split = _splitRepository.getSplitByExpenseId(expense.id);
+    if (split == null || split.slipPersonId == null) {
+      return expense.amount;
+    }
+
+    final participants = _splitRepository.getParticipantsBySplitId(split.id);
+    final collectedFromOthers = participants.fold<double>(0, (sum, p) {
+      if (!p.isSlipPayer && p.isPaid) {
+        return sum + p.amount;
+      }
+      return sum;
+    });
+
+    return (expense.amount - collectedFromOthers)
+        .clamp(0, double.infinity)
+        .toDouble();
+  }
+
   double getTotalForDate(DateTime date) {
-    return _repository.getExpensesByDate(date).fold(0, (sum, e) => sum + e.amount);
+    return _repository
+        .getExpensesByDate(date)
+        .fold(0, (sum, e) => sum + e.amount);
   }
 
-  List<ExpenseModel> getExpensesByDate(DateTime date) {
-    return _repository.getExpensesByDate(date);
+  List<ExpenseModel> getAllExpenses({bool includeDeleted = false}) {
+    return _repository.getAllExpenses(includeDeleted: includeDeleted);
   }
 
-  List<ExpenseModel> getExpensesByMonth(DateTime month) {
-    return _repository.getExpensesByMonth(month);
+  List<ExpenseModel> getExpensesByDate(
+    DateTime date, {
+    bool includeDeleted = false,
+  }) {
+    return _repository.getExpensesByDate(
+      date,
+      includeDeleted: includeDeleted,
+    );
   }
 
-  Map<DateTime, List<ExpenseModel>> getDaysWithExpenses(DateTime month) {
-    return _repository.getDaysWithExpenses(month);
+  List<ExpenseModel> getExpensesByMonth(
+    DateTime month, {
+    bool includeDeleted = false,
+  }) {
+    return _repository.getExpensesByMonth(
+      month,
+      includeDeleted: includeDeleted,
+    );
+  }
+
+  Map<String, List<ExpenseModel>> getExpensesGroupedByDate(
+    DateTime? month, {
+    bool includeDeleted = false,
+    bool deletedOnly = false,
+  }) {
+    return _repository.getExpensesGroupedByDate(
+      month,
+      includeDeleted: includeDeleted,
+      deletedOnly: deletedOnly,
+    );
+  }
+
+  Map<DateTime, List<ExpenseModel>> getDaysWithExpenses(
+    DateTime month, {
+    bool includeDeleted = false,
+  }) {
+    return _repository.getDaysWithExpenses(
+      month,
+      includeDeleted: includeDeleted,
+    );
   }
 
   double getTotalForMonth(DateTime date) {

@@ -13,10 +13,11 @@ class RecentExpensesList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expenseState = ref.watch(expensesProvider);
+    ref.watch(expensesProvider);
     final categories = ref.watch(categoryProvider).categories;
     final currency = ref.watch(currencyProvider);
-    final recentExpenses = expenseState.expenses.take(5).toList();
+    final recentExpenses =
+        ref.read(expensesProvider.notifier).getAllExpenses().take(5).toList();
 
     if (recentExpenses.isEmpty) {
       return Center(
@@ -79,15 +80,19 @@ class RecentExpensesList extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        decoration: isDeleted ? TextDecoration.lineThrough : null,
-                        color: isDeleted ? colorScheme.onSurface.withOpacity(0.4) : null,
+                        decoration:
+                            isDeleted ? TextDecoration.lineThrough : null,
+                        color: isDeleted
+                            ? colorScheme.onSurface.withOpacity(0.4)
+                            : null,
                       ),
                     ),
                     subtitle: Row(
                       children: [
                         if (isDeleted)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             margin: const EdgeInsets.only(right: 6),
                             decoration: BoxDecoration(
                               color: colorScheme.errorContainer,
@@ -117,7 +122,8 @@ class RecentExpensesList extends ConsumerWidget {
                         color: isDeleted
                             ? colorScheme.onSurface.withOpacity(0.3)
                             : colorScheme.error,
-                        decoration: isDeleted ? TextDecoration.lineThrough : null,
+                        decoration:
+                            isDeleted ? TextDecoration.lineThrough : null,
                       ),
                     ),
                     onTap: isDeleted
@@ -127,9 +133,11 @@ class RecentExpensesList extends ConsumerWidget {
                               context: context,
                               isScrollControlled: true,
                               shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(24)),
                               ),
-                              builder: (context) => AddExpenseSheet(expense: expense),
+                              builder: (context) =>
+                                  AddExpenseSheet(expense: expense),
                             );
                           },
                   ),

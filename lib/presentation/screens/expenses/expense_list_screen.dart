@@ -27,13 +27,10 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     final expenseState = ref.watch(expensesProvider);
     final categories = ref.watch(categoryProvider).categories;
     final currency = ref.watch(currencyProvider);
-    final allGrouped = expenseState.groupedExpenses;
 
-    final groupedExpenses = _showDeleted
-        ? Map<String, List<ExpenseModel>>.fromEntries(
-            allGrouped.entries.where((e) => e.value.any((x) => x.isDeleted)).map((e) =>
-              MapEntry(e.key, e.value.where((x) => x.isDeleted).toList())))
-        : allGrouped;
+    final groupedExpenses = ref
+        .read(expensesProvider.notifier)
+        .getExpensesGroupedByDate(null, deletedOnly: _showDeleted);
 
     return Scaffold(
       appBar: AppBar(
@@ -64,13 +61,17 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _showDeleted ? Icons.delete_outline : Icons.receipt_long_outlined,
+                        _showDeleted
+                            ? Icons.delete_outline
+                            : Icons.receipt_long_outlined,
                         size: 64,
                         color: Theme.of(context).colorScheme.outline,
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        _showDeleted ? 'No deleted expenses' : AppStrings.noExpenses,
+                        _showDeleted
+                            ? 'No deleted expenses'
+                            : AppStrings.noExpenses,
                         style: TextStyle(
                           fontSize: 16,
                           color: Theme.of(context).colorScheme.outline,
@@ -86,7 +87,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                     final dateKey = groupedExpenses.keys.elementAt(index);
                     final expenses = groupedExpenses[dateKey]!;
                     final date = DateTime.parse(dateKey);
-                    final dayTotal = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+                    final dayTotal =
+                        expenses.fold<double>(0, (sum, e) => sum + e.amount);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,7 +101,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                         ...expenses.map((expense) {
                           final category = categories.firstWhere(
                             (c) => c.id == expense.categoryId,
-                            orElse: () => categories.firstWhere((c) => c.id == 'other'),
+                            orElse: () =>
+                                categories.firstWhere((c) => c.id == 'other'),
                           );
                           return ExpenseItem(
                             expense: expense,
@@ -111,20 +114,24 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                                 context: context,
                                 isScrollControlled: true,
                                 shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(24)),
                                 ),
-                                builder: (context) => AddExpenseSheet(expense: expense),
+                                builder: (context) =>
+                                    AddExpenseSheet(expense: expense),
                               );
                             },
                             onDelete: () {
                               if (_showDeleted) {
-                                _showPermanentDeleteDialog(context, ref, expense);
+                                _showPermanentDeleteDialog(
+                                    context, ref, expense);
                               } else {
                                 _showSoftDeleteWithUndo(context, ref, expense);
                               }
                             },
                             onRestore: expense.isDeleted
-                                ? () => _showRestoreDialog(context, ref, expense)
+                                ? () =>
+                                    _showRestoreDialog(context, ref, expense)
                                 : null,
                           );
                         }).toList(),
@@ -136,9 +143,14 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     );
   }
 
-  void _showSoftDeleteWithUndo(BuildContext context, WidgetRef ref, dynamic expense) {
+  void _showSoftDeleteWithUndo(
+    BuildContext context,
+    WidgetRef ref,
+    ExpenseModel expense,
+  ) {
     final messenger = ScaffoldMessenger.of(context);
     ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+    messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
         content: Text('"${expense.name}" struck through'),
@@ -146,17 +158,17 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
           label: 'Undo',
           onPressed: () {
             final restored = expense.copyWith(isDeleted: false);
-            if (restored != null) {
-              ref.read(expensesProvider.notifier).updateExpense(restored);
-            }
+            ref.read(expensesProvider.notifier).updateExpense(restored);
           },
         ),
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  void _showPermanentDeleteDialog(BuildContext context, WidgetRef ref, dynamic expense) {
+  void _showPermanentDeleteDialog(
+      BuildContext context, WidgetRef ref, dynamic expense) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -171,7 +183,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(expensesProvider.notifier).permanentlyDeleteExpense(expense.id);
+              ref
+                  .read(expensesProvider.notifier)
+                  .permanentlyDeleteExpense(expense.id);
               Navigator.pop(context);
             },
             style: FilledButton.styleFrom(
@@ -184,7 +198,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     );
   }
 
-  void _showRestoreDialog(BuildContext context, WidgetRef ref, dynamic expense) {
+  void _showRestoreDialog(
+      BuildContext context, WidgetRef ref, dynamic expense) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

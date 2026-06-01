@@ -24,8 +24,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
-    final isSystemDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-    final isDark = themeMode == ThemeMode.system ? isSystemDark : themeMode == ThemeMode.dark;
+    final isSystemDark =
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = themeMode == ThemeMode.system
+        ? isSystemDark
+        : themeMode == ThemeMode.dark;
     final categories = ref.watch(categoryProvider).categories;
     final balanceState = ref.watch(balanceProvider);
     final currency = ref.watch(currencyProvider);
@@ -77,7 +80,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             context,
             'Categories',
             [
-              ...categories.map((category) => _buildCategoryTile(category, ref)),
+              ...categories
+                  .map((category) => _buildCategoryTile(category, ref)),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -85,7 +89,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.primary),
+                  child: Icon(Icons.add,
+                      color: Theme.of(context).colorScheme.primary),
                 ),
                 title: const Text('Add Custom Category'),
                 onTap: () => _showAddCategoryDialog(context, ref),
@@ -104,7 +109,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(currency.icon, color: Theme.of(context).colorScheme.primary),
+                  child: Icon(currency.icon,
+                      color: Theme.of(context).colorScheme.primary),
                 ),
                 title: const Text('Currency'),
                 subtitle: Text('${currency.name} (${currency.symbol})'),
@@ -154,7 +160,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
-                    isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                    isDark
+                        ? Icons.dark_mode_outlined
+                        : Icons.light_mode_outlined,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
@@ -176,7 +184,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSection(BuildContext context, String title, List<Widget> children) {
+  Widget _buildSection(
+      BuildContext context, String title, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -228,19 +237,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         style: const TextStyle(fontSize: 24),
       ),
       title: Text(category.name),
-      subtitle: category.isCustom ? const Text('Custom') : const Text('Default'),
+      subtitle:
+          category.isCustom ? const Text('Custom') : const Text('Default'),
       trailing: category.isCustom
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _showEditCategoryDialog(context, ref, category),
+                  onPressed: () =>
+                      _showEditCategoryDialog(context, ref, category),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () {
-                    ref.read(categoryProvider.notifier).deleteCategory(category.id);
+                    ref
+                        .read(categoryProvider.notifier)
+                        .deleteCategory(category.id);
                   },
                 ),
               ],
@@ -249,7 +262,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showEditCategoryDialog(BuildContext context, WidgetRef ref, dynamic category) {
+  void _showEditCategoryDialog(
+      BuildContext context, WidgetRef ref, dynamic category) {
     final nameController = TextEditingController(text: category.name);
     final emojiController = TextEditingController(text: category.emoji);
 
@@ -325,10 +339,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: Text('${currency.name} (${currency.symbol})'),
                 subtitle: Text(currency.code),
                 trailing: ref.read(currencyProvider).code == currency.code
-                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    ? Icon(Icons.check,
+                        color: Theme.of(context).colorScheme.primary)
                     : null,
                 onTap: () {
-                  ref.read(currencyProvider.notifier).setCurrency(currency.code);
+                  ref
+                      .read(currencyProvider.notifier)
+                      .setCurrency(currency.code);
                   Navigator.pop(context);
                 },
               );
@@ -427,7 +444,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           FilledButton(
             onPressed: () {
-              ref.read(payerNameProvider.notifier).setPayerName(controller.text.trim());
+              ref
+                  .read(payerNameProvider.notifier)
+                  .setPayerName(controller.text.trim());
               Navigator.pop(context);
             },
             child: const Text(AppStrings.save),
@@ -461,8 +480,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _exportData(BuildContext context, WidgetRef ref, String format) async {
+  Future<void> _exportData(
+      BuildContext context, WidgetRef ref, String format) async {
     final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
     try {
       String filePath;
       if (format == 'json') {
@@ -480,7 +501,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Export failed: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -489,13 +510,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _importData(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
     try {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Import Data'),
           content: const Text(
-            'This will replace all current data with the imported data. Continue?',
+            'This will sync your data with the imported file. Matching IDs are updated, new IDs are added, and IDs missing from the file are deleted. Continue?',
           ),
           actions: [
             TextButton(
@@ -520,7 +542,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await ExportImportData.importFromExcel(filePath);
       } else {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Unsupported file format'), behavior: SnackBarBehavior.floating),
+          const SnackBar(
+              content: Text('Unsupported file format'),
+              behavior: SnackBarBehavior.floating),
         );
         return;
       }
@@ -533,7 +557,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Data imported successfully'),
+          content: Text('Data synced successfully'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -541,7 +565,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Import failed: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );

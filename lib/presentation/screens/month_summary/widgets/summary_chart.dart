@@ -6,11 +6,13 @@ import '../../../../data/models/category_model.dart';
 class SummaryChart extends StatelessWidget {
   final Map<String, double> categoryExpenses;
   final List<CategoryModel> categories;
+  final VoidCallback? onTap;
 
   const SummaryChart({
     super.key,
     required this.categoryExpenses,
     required this.categories,
+    this.onTap,
   });
 
   @override
@@ -43,65 +45,73 @@ class SummaryChart extends StatelessWidget {
       index++;
     });
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          children: [
-            const Text(
-              'Expenses by Category',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+    final content = Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        children: [
+          const Text(
+            'Expenses by Category',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              height: 200,
-              child: PieChart(
-                PieChartData(
-                  sections: sections,
-                  centerSpaceRadius: 40,
-                  sectionsSpace: 2,
-                  borderData: FlBorderData(show: false),
-                  pieTouchData: PieTouchData(
-                    touchCallback: (event, response) {
-                      // Tooltip handling can be added here
-                    },
-                  ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 200,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                centerSpaceRadius: 40,
+                sectionsSpace: 2,
+                borderData: FlBorderData(show: false),
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    // Tooltip handling can be added here
+                  },
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.xs,
-              children: categoryExpenses.entries.map((entry) {
-                final category = categories.firstWhere(
-                  (c) => c.id == entry.key,
-                  orElse: () => categories.firstWhere((c) => c.id == 'other'),
-                );
-                final idx = categoryExpenses.keys.toList().indexOf(entry.key);
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors[idx % colors.length],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: categoryExpenses.entries.map((entry) {
+              final category = categories.firstWhere(
+                (c) => c.id == entry.key,
+                orElse: () => categories.firstWhere((c) => c.id == 'other'),
+              );
+              final idx = categoryExpenses.keys.toList().indexOf(entry.key);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: colors[idx % colors.length],
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text('${category.emoji} ${category.name}'),
-                  ],
-                );
-              }).toList(),
-            ),
-          ],
-        ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text('${category.emoji} ${category.name}'),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
       ),
+    );
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: onTap == null
+          ? content
+          : InkWell(
+              onTap: onTap,
+              child: content,
+            ),
     );
   }
 
