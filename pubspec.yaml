@@ -23,6 +23,10 @@ dependencies:
   file_picker: ^11.0.2
   path_provider: ^2.1.1
   excel: ^2.1.0
+  # Direct, though excel already pulls it in: the import guard reads a workbook's
+  # declared entry sizes itself, and depending on it implicitly would let an
+  # excel upgrade drop it out from under us.
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:
