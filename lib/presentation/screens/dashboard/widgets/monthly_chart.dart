@@ -19,12 +19,16 @@ class MonthlyChart extends ConsumerWidget {
     final currency = ref.watch(currencyProvider);
     final balance = ref.watch(balanceProvider);
     final totalSalary = balance.currentMonth.salary;
-    final expenses = ref.read(expensesProvider.notifier).getExpensesByMonth(month);
+    // Accounting date + counted amount, so the bars sum to the month total
+    // shown on the balance card rather than contradicting it.
+    final expenseNotifier = ref.read(expensesProvider.notifier);
+    final expenses = expenseNotifier.getAccountingExpensesByMonth(month);
     final groupedByDay = <int, double>{};
 
     for (final expense in expenses) {
-      final day = expense.date.day;
-      groupedByDay[day] = (groupedByDay[day] ?? 0) + expense.amount;
+      final day = expenseNotifier.getAccountingDate(expense)!.day;
+      groupedByDay[day] =
+          (groupedByDay[day] ?? 0) + expenseNotifier.getCountedAmount(expense);
     }
 
     final daysInMonth = utils.DateUtils.endOfMonth(month).day;
@@ -120,7 +124,7 @@ class MonthlyChart extends ConsumerWidget {
                     horizontalInterval: maxY / 4,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(
-                        color: colorScheme.outlineVariant.withOpacity(0.3),
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                         strokeWidth: 1,
                       );
                     },
@@ -130,7 +134,7 @@ class MonthlyChart extends ConsumerWidget {
                         ? [
                             HorizontalLine(
                               y: (totalSalary / daysInMonth).toDouble(),
-                              color: colorScheme.tertiary.withOpacity(0.6),
+                              color: colorScheme.tertiary.withValues(alpha: 0.6),
                               strokeWidth: 1.5,
                               dashArray: [6, 4],
                               label: HorizontalLineLabel(
@@ -157,7 +161,7 @@ class MonthlyChart extends ConsumerWidget {
                           toY: amount,
                           color: amount > 0
                               ? colorScheme.primary
-                              : colorScheme.outlineVariant.withOpacity(0.3),
+                              : colorScheme.outlineVariant.withValues(alpha: 0.3),
                           width: 8,
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(4),

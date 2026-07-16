@@ -7,7 +7,16 @@ import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../presentation/providers/currency_provider.dart';
 import '../../../../presentation/providers/expense_provider.dart';
+import '../../../../presentation/providers/split_provider.dart';
 import '../../expenses/widgets/expense_item.dart';
+
+/// How much of a split expense has been repaid, and when it last happened.
+class _Settlement {
+  final double repaid;
+  final DateTime? lastPaidAt;
+
+  const _Settlement({required this.repaid, this.lastPaidAt});
+}
 
 class MonthlyExpenseList extends ConsumerWidget {
   final List<ExpenseModel> expenses;
@@ -111,17 +120,31 @@ class MonthlyExpenseList extends ConsumerWidget {
                     utils.DateUtils.formatMonthKey(accountingDate) !=
                         utils.DateUtils.formatMonthKey(expense.date);
 
+                // A split settled later retroactively reduces this month's
+                // counted amount, so say so rather than letting a historical
+                // figure change unexplained.
+                final settlement = _settlementFor(ref, expense);
+                final countedAmount = expenseNotifier.getCountedAmount(expense);
+
+                final details = <String>[
+                  if (isPreviousMonthCredit)
+                    'Original expense: ${utils.DateUtils.formatDisplayDate(expense.date)}',
+                  if (settlement != null)
+                    'You paid ${CurrencyFormatter.format(expense.amount, currency)}'
+                        ' - ${CurrencyFormatter.format(settlement.repaid, currency)} repaid'
+                        '${settlement.lastPaidAt != null ? ' ${utils.DateUtils.formatDisplayDate(settlement.lastPaidAt!)}' : ''}',
+                ];
+
                 return ExpenseItem(
                   expense: expense,
                   category: category,
                   currency: currency,
-                  amountOverride: expenseNotifier.getCountedAmount(expense),
-                  statusLabel: showCreditPaymentDetails
-                      ? 'Credit paid this month'
-                      : null,
-                  detailText: isPreviousMonthCredit
-                      ? 'Original expense: ${utils.DateUtils.formatDisplayDate(expense.date)}'
-                      : null,
+                  amountOverride: countedAmount,
+                  statusLabels: [
+                    if (showCreditPaymentDetails) 'Credit paid this month',
+                    if (settlement != null) 'Split settled',
+                  ],
+                  detailText: details.isEmpty ? null : details.join(' - '),
                   onEdit: () {},
                   onDelete: () {},
                 );
@@ -132,5 +155,26 @@ class MonthlyExpenseList extends ConsumerWidget {
         }).toList(),
       ],
     );
+  }
+
+  /// Returns what others have repaid on this expense's split, or null when the
+  /// expense isn't a split the user fronted or nobody has settled yet.
+  _Settlement? _settlementFor(WidgetRef ref, ExpenseModel expense) {
+    final splitNotifier = ref.read(splitProvider.notifier);
+    final split = splitNotifier.getSplitByExpenseId(expense.id);
+    if (split == null || split.slipPersonId == null) return null;
+
+    final settled = splitNotifier
+        .getParticipantsBySplitId(split.id)
+        .where((p) => !p.isSlipPayer && p.isPaid);
+    if (settled.isEmpty) return null;
+
+    final repaid = settled.fold<double>(0, (sum, p) => sum + p.amount);
+    final lastPaidAt = settled
+        .map((p) => p.paidAt)
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+
+    return _Settlement(repaid: repaid, lastPaidAt: lastPaidAt);
   }
 }

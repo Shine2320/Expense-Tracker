@@ -101,7 +101,7 @@ class DayExpenseSheet extends ConsumerWidget {
                                   ? Theme.of(context)
                                       .colorScheme
                                       .onSurface
-                                      .withOpacity(0.4)
+                                      .withValues(alpha: 0.4)
                                   : null,
                             ),
                           ),
@@ -122,7 +122,7 @@ class DayExpenseSheet extends ConsumerWidget {
                                   ? Theme.of(context)
                                       .colorScheme
                                       .onSurface
-                                      .withOpacity(0.3)
+                                      .withValues(alpha: 0.3)
                                   : Theme.of(context).colorScheme.error,
                               decoration: expense.isDeleted
                                   ? TextDecoration.lineThrough
