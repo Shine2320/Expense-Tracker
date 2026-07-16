@@ -4,7 +4,10 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  # Floor raised from 3.2.3: that stale bound forced pub to resolve win32 5.2.0,
+  # which calls UnmodifiableUint8ListView — removed in Dart 3.4. It broke the
+  # Windows build and every test that imported a screen.
+  sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -17,7 +20,7 @@ dependencies:
   uuid: ^4.3.3
   intl: ^0.19.0
   shared_preferences: ^2.2.2
-  file_picker: ^6.1.1
+  file_picker: ^11.0.2
   path_provider: ^2.1.1
   excel: ^2.1.0
 
