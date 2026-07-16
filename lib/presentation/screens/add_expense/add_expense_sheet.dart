@@ -65,9 +65,11 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           _participants.add(ParticipantEntry(
             nameController: TextEditingController(text: p.name),
             amountController: TextEditingController(text: p.amount.toStringAsFixed(2)),
+            id: p.id,
             amount: p.amount,
             isSlipPayer: p.isSlipPayer,
             isPaid: p.isPaid,
+            paidAt: p.paidAt,
           ));
         }
         // Preserve stored amounts; reconstruct remainder allocations for display
@@ -265,7 +267,17 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
       createdAt: widget.expense?.createdAt ?? DateTime.now(),
       paymentMethod: _paymentMethod,
       creditCardName: _paymentMethod == 'credit_card' ? _creditCardNameController.text.trim() : null,
-      repaymentStatus: _paymentMethod == 'credit_card' ? 'pending' : 'none',
+      // Preserve an existing card expense's repayment state: resetting it to
+      // 'pending' on every edit would un-pay it and drop its amount out of the
+      // month it was actually paid in.
+      repaymentStatus: _paymentMethod == 'credit_card'
+          ? (widget.expense?.isCreditCard == true
+              ? widget.expense!.repaymentStatus
+              : 'pending')
+          : 'none',
+      repaymentDate: _paymentMethod == 'credit_card' && widget.expense?.isCreditCard == true
+          ? widget.expense!.repaymentDate
+          : null,
     );
 
     // ── Build participants list with slip person ──
@@ -274,13 +286,17 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
       splitParticipants = _participants.asMap().entries.map((entry) {
         final index = entry.key;
         final p = entry.value;
+        final isSlipPayer = index == 0 && _isSlipPerson;
         return SplitParticipantModel(
-          id: index == 0 && _isSlipPerson ? _generateId() : '',
+          // Keep the stored identity so an edit doesn't mint a new participant
+          // and orphan their settlement.
+          id: p.id.isNotEmpty ? p.id : (isSlipPayer ? _generateId() : ''),
           splitId: '',
           name: p.nameController.text.trim(),
           amount: _splitMethod == 'equal' ? p.amount : (double.tryParse(p.amountController.text) ?? 0),
-          isSlipPayer: index == 0 && _isSlipPerson,
+          isSlipPayer: isSlipPayer,
           isPaid: p.isPaid,
+          paidAt: p.paidAt,
         );
       }).toList();
 
