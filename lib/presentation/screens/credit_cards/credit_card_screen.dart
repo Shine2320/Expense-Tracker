@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_spacing.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/money_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/category_model.dart';
 import '../../../data/models/currency_config.dart';
@@ -8,6 +10,7 @@ import '../../../data/models/expense_model.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../providers/expense_provider.dart';
+import '../../widgets/common/empty_state.dart';
 
 class CreditCardScreen extends ConsumerStatefulWidget {
   const CreditCardScreen({super.key});
@@ -34,17 +37,29 @@ class _CreditCardScreenState extends ConsumerState<CreditCardScreen> {
     final pending = creditExpenses.where((e) => e.isPending).toList();
     final paid = creditExpenses.where((e) => e.isPaid).toList();
     final selectedExpenses = _selectedStatus == 'paid' ? paid : pending;
-    final grouped = _groupByCard(selectedExpenses);
 
-    final pendingTotal = pending.fold<double>(0, (sum, e) => sum + e.amount);
-    final paidTotal = paid.fold<double>(0, (sum, e) => sum + e.amount);
+    // Net of split repayments — what you actually owe / paid on the card.
+    final expenseNotifier = ref.read(expensesProvider.notifier);
+    final netByExpenseId = <String, double>{
+      for (final e in creditExpenses) e.id: expenseNotifier.getNetSplitAmount(e),
+    };
+    final grouped = _groupByCard(selectedExpenses, netByExpenseId);
+    final pendingTotal =
+        pending.fold<double>(0, (sum, e) => sum + (netByExpenseId[e.id] ?? 0));
+    final paidTotal =
+        paid.fold<double>(0, (sum, e) => sum + (netByExpenseId[e.id] ?? 0));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Credit Cards'),
       ),
       body: creditExpenses.isEmpty
-          ? _EmptyCreditCards(colorScheme: colorScheme)
+          ? const EmptyState(
+              icon: Icons.credit_card_outlined,
+              message: 'No credit card expenses',
+              hint: 'Add an expense and pick "Credit card" as the payment '
+                  'method. It counts against the month you pay the card off.',
+            )
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.md),
               children: [
@@ -73,11 +88,16 @@ class _CreditCardScreenState extends ConsumerState<CreditCardScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 if (grouped.isEmpty)
-                  _EmptyStatus(
-                    label: _selectedStatus == 'paid'
-                        ? 'No paid credit card expenses'
-                        : 'No pending credit card expenses',
-                    colorScheme: colorScheme,
+                  EmptyState(
+                    icon: _selectedStatus == 'paid'
+                        ? Icons.task_alt_outlined
+                        : Icons.inbox_outlined,
+                    message: _selectedStatus == 'paid'
+                        ? 'Nothing paid off yet'
+                        : 'Nothing outstanding',
+                    hint: _selectedStatus == 'paid'
+                        ? 'Cards you mark as paid will appear here.'
+                        : 'Every card expense is settled.',
                   )
                 else
                   ...grouped.map(
@@ -103,13 +123,22 @@ class _CreditCardScreenState extends ConsumerState<CreditCardScreen> {
     );
   }
 
-  List<_CardExpenseGroup> _groupByCard(List<ExpenseModel> expenses) {
+  List<_CardExpenseGroup> _groupByCard(
+    List<ExpenseModel> expenses,
+    Map<String, double> netByExpenseId,
+  ) {
     final groups = <String, _CardExpenseGroup>{};
 
     for (final expense in expenses) {
       final cardName = _displayCardName(expense.creditCardName);
       final key = cardName.toLowerCase();
-      groups.putIfAbsent(key, () => _CardExpenseGroup(cardName: cardName));
+      groups.putIfAbsent(
+        key,
+        () => _CardExpenseGroup(
+          cardName: cardName,
+          netByExpenseId: netByExpenseId,
+        ),
+      );
       groups[key]!.expenses.add(expense);
     }
 
@@ -131,70 +160,14 @@ class _CardExpenseGroup {
   final String cardName;
   final List<ExpenseModel> expenses = [];
 
-  _CardExpenseGroup({required this.cardName});
+  /// Net-of-split amounts, keyed by expense id. This class has no `ref`, so the
+  /// screen resolves the amounts once and passes them in.
+  final Map<String, double> netByExpenseId;
 
-  double get total => expenses.fold<double>(0, (sum, e) => sum + e.amount);
-}
+  _CardExpenseGroup({required this.cardName, required this.netByExpenseId});
 
-class _EmptyCreditCards extends StatelessWidget {
-  final ColorScheme colorScheme;
-
-  const _EmptyCreditCards({required this.colorScheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.credit_card_outlined,
-            size: 64,
-            color: colorScheme.outline,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No credit card expenses',
-            style: TextStyle(
-              color: colorScheme.outline,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyStatus extends StatelessWidget {
-  final String label;
-  final ColorScheme colorScheme;
-
-  const _EmptyStatus({
-    required this.label,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      child: Column(
-        children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: colorScheme.outline,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            label,
-            style: TextStyle(color: colorScheme.outline),
-          ),
-        ],
-      ),
-    );
-  }
+  double get total =>
+      expenses.fold<double>(0, (sum, e) => sum + (netByExpenseId[e.id] ?? 0));
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -218,32 +191,27 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Summary',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
+            Text('Summary', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Expanded(
                   child: _SummaryTile(
-                    label: 'Pending',
+                    label: 'Still owed',
                     amount: pendingTotal,
                     currency: currency,
-                    color: colorScheme.tertiary,
+                    container: context.money.pendingContainer,
+                    onContainer: context.money.onPendingContainer,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: _SummaryTile(
-                    label: 'Paid',
+                    label: 'Paid off',
                     amount: paidTotal,
                     currency: currency,
-                    color: colorScheme.primary,
+                    container: context.money.positiveContainer,
+                    onContainer: context.money.onPositiveContainer,
                   ),
                 ),
               ],
@@ -259,40 +227,45 @@ class _SummaryTile extends StatelessWidget {
   final String label;
   final double amount;
   final CurrencyConfig currency;
-  final Color color;
+  final Color container;
+  final Color onContainer;
 
   const _SummaryTile({
     required this.label,
     required this.amount,
     required this.currency,
-    required this.color,
+    required this.container,
+    required this.onContainer,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: container,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-            ),
+            label.toUpperCase(),
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: onContainer),
           ),
-          const SizedBox(height: 4),
-          Text(
-            CurrencyFormatter.format(amount, currency),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              CurrencyFormatter.format(amount, currency),
+              style: MoneyText.large(context).copyWith(color: onContainer),
             ),
           ),
         ],
@@ -379,6 +352,7 @@ class _CreditCardGroup extends StatelessWidget {
           ...group.expenses.map(
             (expense) => _CreditCardTile(
               expense: expense,
+              netAmount: group.netByExpenseId[expense.id] ?? expense.amount,
               category: _categoryFor(expense.categoryId),
               currency: currency,
               colorScheme: colorScheme,
@@ -408,6 +382,9 @@ class _CreditCardGroup extends StatelessWidget {
 
 class _CreditCardTile extends StatelessWidget {
   final ExpenseModel expense;
+
+  /// What this expense actually costs you after any split repayments.
+  final double netAmount;
   final CategoryModel category;
   final CurrencyConfig currency;
   final ColorScheme colorScheme;
@@ -416,6 +393,7 @@ class _CreditCardTile extends StatelessWidget {
 
   const _CreditCardTile({
     required this.expense,
+    required this.netAmount,
     required this.category,
     required this.currency,
     required this.colorScheme,
@@ -438,7 +416,7 @@ class _CreditCardTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           decoration: isPaid ? TextDecoration.lineThrough : null,
-          color: isPaid ? colorScheme.onSurface.withOpacity(0.4) : null,
+          color: isPaid ? colorScheme.onSurface.withValues(alpha: 0.4) : null,
         ),
       ),
       subtitle: Text(
@@ -454,13 +432,13 @@ class _CreditCardTile extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 96),
             child: Text(
-              CurrencyFormatter.format(expense.amount, currency),
+              CurrencyFormatter.format(netAmount, currency),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: isPaid
-                    ? colorScheme.onSurface.withOpacity(0.3)
+                    ? colorScheme.onSurface.withValues(alpha: 0.3)
                     : colorScheme.error,
                 decoration: isPaid ? TextDecoration.lineThrough : null,
               ),

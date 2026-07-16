@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../providers/migration_notice_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../calendar/calendar_screen.dart';
 import '../expenses/expense_list_screen.dart';
@@ -22,6 +23,25 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ExpenseListScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showMigrationNotice());
+  }
+
+  void _showMigrationNotice() {
+    final notice = ref.read(migrationNoticeProvider);
+    if (notice == null || !mounted) return;
+    ref.read(migrationNoticeProvider.notifier).state = null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(notice),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
+
   void _onTabSelected(int index) {
     setState(() {
       _currentIndex = index;
@@ -41,20 +61,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final showFab = _currentIndex == 0;
-
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      floatingActionButton: showFab
-          ? FloatingActionButton.extended(
-              onPressed: _showAddExpenseSheet,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Expense'),
-            )
-          : null,
+      // Available on every tab: adding an expense is the app's primary action,
+      // and it was previously unreachable from the Expenses and Calendar tabs.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddExpenseSheet,
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.addExpense),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
