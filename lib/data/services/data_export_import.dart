@@ -67,109 +67,91 @@ class ExportImportData {
   }
 
   // ── Deserialize from JSON map (import) ──
+  ///
+  /// Parses every section before writing any of them. Committing a section
+  /// prunes the keys the payload omits, so a model that throws part-way through
+  /// (several `fromMap`s cast required fields without a default) would otherwise
+  /// leave earlier boxes already pruned while the caller reports "import
+  /// failed" — data destroyed by an import the user was told did not happen.
+  /// Parsing first keeps a malformed payload from touching the boxes at all.
   static Future<void> _deserializeAll(Map<String, dynamic> data) async {
-    // Expenses
-    if (data['expenses'] is List) {
-      final importedIds = <String>{};
-      for (final item in data['expenses'] as List) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final id = map['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        importedIds.add(id);
-        await _expenseBox.put(
-          id,
-          ExpenseModel.fromMap({
-            ...map,
-            'id': id,
-            'amount': _toDouble(map['amount']),
-            'date': _toDateTime(map['date']),
-            'createdAt': _toDateTime(map['createdAt']),
-            'repaymentDate': _toNullableDateTime(map['repaymentDate']),
-          }),
-        );
-      }
-      await _deleteMissingKeys(_expenseBox, importedIds);
+    // Phase 1 — parse. Any malformed section throws here, boxes still intact.
+    final expenses = _parseSection(
+      data['expenses'],
+      (map, id) => ExpenseModel.fromMap({
+        ...map,
+        'id': id,
+        'amount': _toDouble(map['amount']),
+        'date': _toDateTime(map['date']),
+        'createdAt': _toDateTime(map['createdAt']),
+        'repaymentDate': _toNullableDateTime(map['repaymentDate']),
+      }),
+    );
+    final categories = _parseSection(
+      data['categories'],
+      (map, id) => CategoryModel.fromMap({...map, 'id': id}),
+    );
+    final balances = _parseSection(
+      data['monthlyBalances'],
+      (map, id) => MonthlyBalanceModel.fromMap({
+        ...map,
+        'id': id,
+        'salary': _toDouble(map['salary']),
+        'carryOver': _toDouble(map['carryOver']),
+        'totalExpenses': _toDouble(map['totalExpenses']),
+        'carryOverAdjustment': _toDouble(map['carryOverAdjustment']),
+      }),
+    );
+    final splits = _parseSection(
+      data['expenseSplits'],
+      (map, id) => ExpenseSplitModel.fromMap({
+        ...map,
+        'id': id,
+        'totalAmount': _toDouble(map['totalAmount']),
+        'createdAt': _toDateTime(map['createdAt']),
+      }),
+    );
+    final participants = _parseSection(
+      data['splitParticipants'],
+      (map, id) => SplitParticipantModel.fromMap({
+        ...map,
+        'id': id,
+        'amount': _toDouble(map['amount']),
+        'paidAt': _toNullableDateTime(map['paidAt']),
+      }),
+    );
+
+    // Phase 2 — commit. Everything above parsed, so these writes can proceed.
+    await _commitSection(_expenseBox, expenses);
+    await _commitSection(_categoryBox, categories);
+    await _commitSection(_balanceBox, balances);
+    await _commitSection(_splitBox, splits);
+    await _commitSection(_participantBox, participants);
+  }
+
+  /// Parses one export section. Returns null when the section is absent, which
+  /// leaves that box untouched — distinct from an empty list, which is a
+  /// legitimate export of "no rows" and prunes the box on commit.
+  static Map<String, T>? _parseSection<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic> map, String id) build,
+  ) {
+    if (raw is! List) return null;
+    final parsed = <String, T>{};
+    for (final item in raw) {
+      final map = Map<String, dynamic>.from(item as Map);
+      final id = map['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      parsed[id] = build(map, id);
     }
-    // Categories
-    if (data['categories'] is List) {
-      final importedIds = <String>{};
-      for (final item in data['categories'] as List) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final id = map['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        importedIds.add(id);
-        await _categoryBox.put(
-          id,
-          CategoryModel.fromMap({
-            ...map,
-            'id': id,
-          }),
-        );
-      }
-      await _deleteMissingKeys(_categoryBox, importedIds);
-    }
-    // Monthly balances
-    if (data['monthlyBalances'] is List) {
-      final importedIds = <String>{};
-      for (final item in data['monthlyBalances'] as List) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final id = map['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        importedIds.add(id);
-        await _balanceBox.put(
-          id,
-          MonthlyBalanceModel.fromMap({
-            ...map,
-            'id': id,
-            'salary': _toDouble(map['salary']),
-            'carryOver': _toDouble(map['carryOver']),
-            'totalExpenses': _toDouble(map['totalExpenses']),
-            'carryOverAdjustment': _toDouble(map['carryOverAdjustment']),
-          }),
-        );
-      }
-      await _deleteMissingKeys(_balanceBox, importedIds);
-    }
-    // Expense splits
-    if (data['expenseSplits'] is List) {
-      final importedIds = <String>{};
-      for (final item in data['expenseSplits'] as List) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final id = map['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        importedIds.add(id);
-        await _splitBox.put(
-          id,
-          ExpenseSplitModel.fromMap({
-            ...map,
-            'id': id,
-            'totalAmount': _toDouble(map['totalAmount']),
-            'createdAt': _toDateTime(map['createdAt']),
-          }),
-        );
-      }
-      await _deleteMissingKeys(_splitBox, importedIds);
-    }
-    // Split participants
-    if (data['splitParticipants'] is List) {
-      final importedIds = <String>{};
-      for (final item in data['splitParticipants'] as List) {
-        final map = Map<String, dynamic>.from(item as Map);
-        final id = map['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        importedIds.add(id);
-        await _participantBox.put(
-          id,
-          SplitParticipantModel.fromMap({
-            ...map,
-            'id': id,
-            'amount': _toDouble(map['amount']),
-            'paidAt': _toNullableDateTime(map['paidAt']),
-          }),
-        );
-      }
-      await _deleteMissingKeys(_participantBox, importedIds);
-    }
+    return parsed;
+  }
+
+  static Future<void> _commitSection<T>(
+      Box<T> box, Map<String, T>? parsed) async {
+    if (parsed == null) return;
+    await box.putAll(parsed);
+    await _deleteMissingKeys(box, parsed.keys.toSet());
   }
 
   static double _toDouble(dynamic value) {
@@ -221,6 +203,25 @@ class ExportImportData {
         await getApplicationDocumentsDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$fileName');
     await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
+  /// Writes a full JSON backup to app-private storage.
+  ///
+  /// Used by the automatic migration backup, which the user never asked for and
+  /// is not prompted about. [exportToJson] would put the whole financial history
+  /// — salary, every expense, participant names — in shared Downloads, where it
+  /// outlives an uninstall, is readable by any app holding all-files access, and
+  /// syncs to cloud backup. An unprompted backup belongs somewhere only this app
+  /// can read; a user-initiated export is a deliberate act and still goes to
+  /// Downloads.
+  static Future<String> exportBackupToAppStorage() async {
+    final jsonStr = const JsonEncoder.withIndent('  ').convert(_serializeAll());
+    final fileName =
+        'expense_tracker_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}${Platform.pathSeparator}$fileName');
+    await file.writeAsBytes(utf8.encode(jsonStr), flush: true);
     return file.path;
   }
 

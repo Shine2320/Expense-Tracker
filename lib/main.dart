@@ -60,9 +60,10 @@ class _AppWithSplashState extends ConsumerState<_AppWithSplash> {
     if (!mounted) return;
 
     if (migration.migrated) {
-      ref.read(migrationNoticeProvider.notifier).state = migration.backupError == null
-          ? 'Balances recalculated. A backup was saved to your Downloads folder.'
-          : 'Balances recalculated, but the automatic backup could not be saved.';
+      ref.read(migrationNoticeProvider.notifier).state =
+          migration.backupError == null
+              ? 'Balances recalculated. A backup was saved inside the app.'
+              : 'Balances recalculated, but the automatic backup could not be saved.';
     }
     setState(() => _initialized = true);
   }

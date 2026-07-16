@@ -26,8 +26,8 @@ class BalanceMigrationResult {
 /// to zero and silently discarding the user's opening balance.
 ///
 /// This seeds that opening balance into the adjustment so it survives, and takes
-/// a JSON backup first because every later month's stored figure is about to be
-/// recalculated.
+/// a JSON backup to app-private storage first because every later month's stored
+/// figure is about to be recalculated.
 ///
 /// **Must run before the first [ExpenseRepository.reconcileMonthlyExpenses] of
 /// the process**: once the chain has zeroed the earliest month's `carryOver`,
@@ -51,7 +51,7 @@ class BalanceMigration {
     String? backupPath;
     Object? backupError;
     try {
-      backupPath = await ExportImportData.exportToJson();
+      backupPath = await ExportImportData.exportBackupToAppStorage();
     } catch (e) {
       // A failed backup must not block the seed below: leaving the earliest
       // month unseeded would lose its opening balance permanently on the very
