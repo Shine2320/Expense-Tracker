@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expense Tracker — Developer Documentation</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f7f5fa;
+    --surface-2: #efecf4;
+    --text: #1c1b1f;
+    --text-dim: #49454f;
+    --border: #e0dce6;
+    --primary: #6750a4;
+    --primary-dim: #eaddff;
+    --code-bg: #f4f1f8;
+    --danger: #b3261e;
+    --danger-bg: #fceeed;
+    --warn: #8a5000;
+    --warn-bg: #fff4e3;
+    --ok: #146b3a;
+    --ok-bg: #e9f8ef;
+    --mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131218;
+      --surface: #1c1b22;
+      --surface-2: #24222c;
+      --text: #e6e1e9;
+      --text-dim: #cac4d0;
+      --border: #322f3a;
+      --primary: #cfbcff;
+      --primary-dim: #4a4458;
+      --code-bg: #1e1c25;
+      --danger: #f2b8b5;
+      --danger-bg: #2b1513;
+      --warn: #ffd08a;
+      --warn-bg: #2e2010;
+      --ok: #7adf9e;
+      --ok-bg: #10251a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap { display: flex; max-width: 1400px; margin: 0 auto; }
+  nav {
+    position: sticky; top: 0; align-self: flex-start;
+    height: 100vh; overflow-y: auto;
+    width: 270px; flex: 0 0 270px;
+    padding: 28px 18px; border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+  nav h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .09em; color: var(--text-dim); margin: 22px 0 8px; }
+  nav h2:first-child { margin-top: 0; }
+  nav a { display: block; padding: 5px 10px; border-radius: 7px; color: var(--text-dim); text-decoration: none; font-size: .87rem; }
+  nav a:hover { background: var(--surface-2); color: var(--text); }
+  main { flex: 1; min-width: 0; padding: 40px 44px 120px; }
+  header.hero { border-bottom: 1px solid var(--border); padding-bottom: 26px; margin-bottom: 34px; }
+  h1 { font-size: 2.1rem; margin: 0 0 6px; letter-spacing: -.02em; }
+  .sub { color: var(--text-dim); font-size: 1.02rem; margin: 0; }
+  h2.sec { font-size: 1.5rem; margin: 52px 0 14px; padding-top: 14px; border-top: 1px solid var(--border); letter-spacing: -.01em; }
+  h3 { font-size: 1.13rem; margin: 30px 0 8px; }
+  h4 { font-size: .98rem; margin: 20px 0 6px; color: var(--text-dim); }
+  p { margin: 10px 0; }
+  code { font-family: var(--mono); font-size: .85em; background: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: .82rem; line-height: 1.55; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: .88rem; }
+  th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; color: var(--text-dim); font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; }
+  td code { white-space: nowrap; }
+  .note, .warn, .danger, .ok { border-radius: 10px; padding: 13px 16px; margin: 16px 0; border-left: 3px solid; font-size: .93rem; }
+  .note { background: var(--surface); border-color: var(--primary); }
+  .warn { background: var(--warn-bg); border-color: var(--warn); }
+  .danger { background: var(--danger-bg); border-color: var(--danger); }
+  .ok { background: var(--ok-bg); border-color: var(--ok); }
+  .note strong, .warn strong, .danger strong, .ok strong { display: block; margin-bottom: 3px; }
+  .pill { display: inline-block; font-size: .7rem; padding: 1px 8px; border-radius: 999px; background: var(--primary-dim); color: var(--text); font-weight: 600; letter-spacing: .02em; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 5px 0; }
+  .file { font-family: var(--mono); font-size: .82rem; color: var(--primary); font-weight: 600; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 18px; font-size: .9rem; margin: 12px 0; }
+  .kv dt { color: var(--text-dim); }
+  .kv dd { margin: 0; }
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { padding: 28px 20px 80px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <h2>Start</h2>
+  <a href="#overview">Overview</a>
+  <a href="#setup">Setup &amp; run</a>
+  <a href="#arch">Architecture</a>
+  <h2>Core</h2>
+  <a href="#rules">Business rules</a>
+  <a href="#data">Data model</a>
+  <a href="#storage">Storage &amp; migrations</a>
+  <h2>Reference</h2>
+  <a href="#f-entry">Entry &amp; core</a>
+  <a href="#f-data">Data layer</a>
+  <a href="#f-providers">Providers</a>
+  <a href="#f-screens">Screens &amp; widgets</a>
+  <h2>Ship</h2>
+  <a href="#testing">Testing</a>
+  <a href="#build">Build &amp; publish</a>
+  <a href="#issues">Known issues</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Expense Tracker</h1>
+  <p class="sub">A local-first Flutter expense tracker with credit-card repayment accounting and bill splitting. Material 3, Riverpod, Hive. No network, no accounts, no telemetry.</p>
+</header>
+
+<section id="overview">
+<h2 class="sec">Overview</h2>
+
+<p>Expense Tracker records what you spend against a monthly salary and tells you what's left. Two things make it more than a list of numbers, and both are where its complexity lives:</p>
+
+<ul>
+  <li><strong>Credit-card expenses</strong> are counted in the month you <em>pay the card</em>, not the month you swiped it. An unpaid card expense counts against no month at all.</li>
+  <li><strong>Split expenses</strong> let you front a bill for other people. Only your share counts against your salary, and when someone repays you, the month you originally paid gets corrected.</li>
+</ul>
+
+<p>Everything is stored on-device in Hive. There is no INTERNET permission in the Android manifest, no analytics, and no API keys anywhere in the tree.</p>
+
+<div class="kv">
+  <dt>Package</dt><dd><code>expense_tracker</code> v1.0.0+1</dd>
+  <dt>Flutter</dt><dd>≥ 3.16 &nbsp;·&nbsp; Dart <code>&gt;=3.2.3 &lt;4.0.0</code></dd>
+  <dt>State</dt><dd>flutter_riverpod 2.x</dd>
+  <dt>Storage</dt><dd>Hive 2.x — 5 boxes, no SQL</dd>
+  <dt>Target</dt><dd>Android-first (minSdk 33). See <a href="#issues">Known issues</a> for other platforms.</dd>
+  <dt>Source</dt><dd>~53 Dart files under <code>lib/</code></dd>
+</div>
+</section>
+
+<section id="setup">
+<h2 class="sec">Setup &amp; run</h2>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Flutter SDK on the <code>stable</code> channel (pinned revision <code>78666c8dc5</code> in <code>.metadata</code>)</li>
+  <li>JDK 17 — required by the Android Gradle Plugin 8.6 toolchain</li>
+  <li>Android SDK 34, and a device or emulator running <strong>Android 13 (API 33) or newer</strong></li>
+</ul>
+
+<h3>First run</h3>
+<pre><code>git clone &lt;repo&gt; &amp;&amp; cd Expense-Tracker
+flutter pub get
+
+# Generate the Hive type adapters (*.g.dart). Required — they are gitignored
+# in many setups and the app will not compile without them.
+dart run build_runner build --delete-conflicting-outputs
+
+flutter run</code></pre>
+
+<div class="warn">
+  <strong>Re-run build_runner whenever a model changes</strong>
+  Adding or changing any <code>@HiveField</code> means the generated adapter is stale. A stale adapter either fails to compile or — worse — throws at runtime when reading existing records. See <a href="#storage">Storage &amp; migrations</a>.
+</div>
+
+<h3>Local config</h3>
+<p><code>android/local.properties</code> is generated by Flutter and must contain <code>flutter.sdk</code>; <code>settings.gradle</code> hard-asserts on it. There are no <code>.env</code> files, no secrets, and no API keys — the app has no network layer.</p>
+
+<h3>Everyday commands</h3>
+<div class="scroll">
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>flutter run</code></td><td>Debug run on the attached device</td></tr>
+  <tr><td><code>flutter test</code></td><td>Run the suite. Must run from the repo root — some tests read source files by relative path.</td></tr>
+  <tr><td><code>flutter analyze</code></td><td>Static analysis (<code>flutter_lints</code>). Currently clean.</td></tr>
+  <tr><td><code>dart run build_runner build --delete-conflicting-outputs</code></td><td>Regenerate Hive adapters</td></tr>
+  <tr><td><code>dart run flutter_launcher_icons</code></td><td>Regenerate launcher icons from <code>assets/icon/app_icon.png</code></td></tr>
+</table>
+</div>
+</section>
+
+<section id="arch">
+<h2 class="sec">Architecture</h2>
+
+<p>Three layers, one direction of dependency. Widgets never touch Hive; repositories never import Flutter.</p>
+
+<pre><code>presentation/  screens, widgets, Riverpod providers
+      │  reads/writes through
+      ▼
+data/          repositories, services, models
+      │  persists via
+      ▼
+Hive           5 local boxes, keyed by the model's own id</code></pre>
+
+<h3>State: Riverpod</h3>
+<p>All state is global <code>final</code> providers — there is no explicit registration list; they're pulled in by import. <code>ProviderScope</code> wraps the app in <code>main.dart</code>.</p>
+
+<div class="scroll">
+<table>
+  <tr><th>Provider</th><th>Type</th><th>Holds</th></tr>
+  <tr><td><code>expensesProvider</code></td><td>StateNotifier</td><td><code>ExpenseState</code> — expenses, grouped, isLoading</td></tr>
+  <tr><td><code>balanceProvider</code></td><td>StateNotifier</td><td><code>BalanceState</code> — currentMonth, allMonths</td></tr>
+  <tr><td><code>splitProvider</code></td><td>StateNotifier</td><td><code>SplitState</code> — splits, pendingPayments</td></tr>
+  <tr><td><code>categoryProvider</code></td><td>StateNotifier</td><td><code>CategoryState</code> — categories</td></tr>
+  <tr><td><code>themeProvider</code></td><td>StateNotifier</td><td><code>ThemeMode</code> (default: system)</td></tr>
+  <tr><td><code>currencyProvider</code></td><td>StateNotifier</td><td><code>CurrencyConfig</code> (default: USD)</td></tr>
+  <tr><td><code>payerNameProvider</code></td><td>StateNotifier</td><td><code>String</code> — your name on splits</td></tr>
+  <tr><td><code>calendarProvider</code></td><td>StateNotifier</td><td><code>DateTime</code> — focused day</td></tr>
+  <tr><td><code>migrationNoticeProvider</code></td><td>StateProvider</td><td><code>String?</code> — one-shot migration message</td></tr>
+  <tr><td><code>*RepositoryProvider</code></td><td>Provider</td><td>Repository singletons (session-lived)</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <strong>Cross-provider wiring worth knowing</strong>
+  <code>expensesProvider</code> and <code>splitProvider</code> each receive a callback <code>() =&gt; ref.read(balanceProvider.notifier).loadBalance()</code>. That's how settling a split refreshes the dashboard — the split notifier reconciles, then pokes the balance notifier. Break that wire and the dashboard silently goes stale.
+</div>
+
+<h3>Navigation</h3>
+<p>There is <strong>no router and no named-route table</strong>. Top-level tabs are an <code>IndexedStack</code> in <code>HomeShell</code>; everything else is an imperative <code>Navigator.push(MaterialPageRoute(...))</code> or a <code>showModalBottomSheet</code>. Adding a screen means pushing it from wherever you need it.</p>
+
+<h3>Theme</h3>
+<p><code>AppTheme</code> builds light and dark from one seed colour, and installs <code>MoneyColors</code> as a <code>ThemeExtension</code>. Widgets read <code>Theme.of(context).textTheme</code>, <code>colorScheme</code>, and <code>context.money</code> — never raw hex, never a bare <code>fontSize:</code>.</p>
+<pre><code>// Semantic, and correct in both light and dark:
+Text(amount, style: MoneyText.medium(context)
+    .copyWith(color: context.money.forBalance(remaining)));</code></pre>
+<p><code>MoneyColors</code> carries four semantic roles — <code>positive</code> (money kept), <code>negative</code> (money spent), <code>pending</code> (owed, e.g. an unpaid card), <code>settled</code> — each with a container/on-container pair for chips.</p>
+</section>
+
+<section id="rules">
+<h2 class="sec">Business rules</h2>
+
+<div class="danger">
+  <strong>Read this section before changing any number on any screen</strong>
+  Every serious bug this app has had came from a screen inventing its own arithmetic instead of using the rules below. If you are summing <code>expense.amount</code> in a widget, you are almost certainly wrong.
+</div>
+
+<h3>1. The accounting date — which month an expense belongs to</h3>
+<p><span class="file">expense_repository.dart</span> → <code>getAccountingDate()</code></p>
+<pre><code>DateTime? getAccountingDate(ExpenseModel expense) {
+  if (expense.isDeleted) return null;          // counts nowhere
+  if (!expense.isCreditCard) return expense.date;
+  if (!expense.isPaid) return null;            // unpaid card: counts NOWHERE
+  return expense.repaymentDate ?? expense.date; // the month you PAID the card
+}</code></pre>
+
+<div class="scroll">
+<table>
+  <tr><th>Expense</th><th>Counts in</th><th>Why</th></tr>
+  <tr><td>Cash / debit</td><td>Its own date</td><td>The money left when you spent it</td></tr>
+  <tr><td>Credit card, unpaid</td><td><em>Nowhere</em></td><td>Your salary hasn't been touched yet — it's a liability, shown as "Card due"</td></tr>
+  <tr><td>Credit card, paid</td><td>The <strong>repayment</strong> month</td><td>That's the month your salary actually paid for it</td></tr>
+  <tr><td>Deleted (struck out)</td><td><em>Nowhere</em></td><td>Soft-deleted rows stay in the box but count for nothing</td></tr>
+</table>
+</div>
+
+<p>So a card expense from 20 May that you pay on 3 June counts against <strong>June's</strong> salary. It appears in June's summary labelled <em>"Credit paid this month · Original expense: 20 May"</em>.</p>
+
+<h3>2. The counted amount — how much an expense actually costs you</h3>
+<p><span class="file">expense_repository.dart</span> → <code>getNetSplitAmount()</code> / <code>getCountedAmount()</code></p>
+<p>For a split you fronted, only your share is yours. Every participant who has repaid you is subtracted:</p>
+<pre><code>net = expense.amount − Σ(paid, non-slip-payer participants)   // floored at 0</code></pre>
+
+<div class="scroll">
+<table>
+  <tr><th>Method</th><th>Returns</th><th>Use for</th></tr>
+  <tr><td><code>getNetSplitAmount(e)</code></td><td>Net cost, <em>ignoring</em> whether it's counted yet</td><td>"What do I still owe on this card?" — pending card totals</td></tr>
+  <tr><td><code>getCountedAmount(e)</code></td><td>Net cost, or <strong>0</strong> if it counts in no month</td><td>Anything that must agree with a month's total</td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <strong>These two are not interchangeable</strong>
+  <code>getCountedAmount()</code> returns <strong>0</strong> for a pending card expense (it has no accounting date). Use it for a "card due" figure and the screen will always read zero. Use <code>getNetSplitAmount()</code> there instead.
+</div>
+
+<h3>3. The carry-over chain — how months link together</h3>
+<p><span class="file">balance_repository.dart</span> → <code>rebuildCarryOverChain()</code></p>
+<p>Each month's balance is <code>salary + carryOver − totalExpenses</code>, and each month's carry-over is the previous month's remainder:</p>
+<pre><code>void rebuildCarryOverChain() {
+  // "YYYY-MM" is zero-padded → lexicographic sort == chronological.
+  final balances = _box.values.toList()..sort((a, b) => a.id.compareTo(b.id));
+  var previousRemaining = 0.0;
+  for (final balance in balances) {
+    balance.carryOver = previousRemaining + balance.carryOverAdjustment;
+    _box.put(balance.id, balance);
+    previousRemaining = balance.remainingBalance;  // read AFTER assigning
+  }
+}</code></pre>
+
+<p>Properties that are load-bearing, not incidental:</p>
+<ul>
+  <li><strong>The chain runs after totals, always.</strong> Each month's remainder feeds the next, so <code>totalExpenses</code> must be final before the walk starts.</li>
+  <li><strong>Negatives roll forward.</strong> Overspend May and June starts in the hole. The same wire that carries an improvement forward must carry a shortfall, or money is created from nothing.</li>
+  <li><strong>Gap months pass through.</strong> Only existing rows are walked; a month with no salary and no expenses is a no-op, so May's remainder correctly reaches July. Rows are never synthesised.</li>
+  <li><strong>The earliest month is its own opening balance.</strong> It has no predecessor, so <code>previousRemaining</code> is 0 and its carry-over is exactly its adjustment. No special case needed.</li>
+</ul>
+
+<h4>Manual carry-over is an adjustment, not an override</h4>
+<p>When you type a carry-over, the app stores the <em>difference</em> from the calculated value in <code>carryOverAdjustment</code>, not the number itself:</p>
+<pre><code>Calculated from last month:  3000
+You type:                    3200   →  carryOverAdjustment = +200
+
+A friend later repays a 500 split from last month:
+Calculated becomes:          3500
+Displayed carry-over:        3700   (3500 + your 200)</code></pre>
+<p>This is why the field exists. A plain override would freeze the month, and later corrections — the exact thing this app is supposed to track — would never reach it. "Use calculated" in the carry-over dialog sets the adjustment back to 0.</p>
+
+<h3>4. Reconciliation — the one true recompute</h3>
+<p><span class="file">expense_repository.dart</span> → <code>reconcileMonthlyExpenses()</code></p>
+<p>Rebuilds every month's <code>totalExpenses</code> from scratch, then rebuilds the carry-over chain. It runs on app start, after every split mutation, and after every import. It is idempotent — running it twice yields byte-identical balances, and there's a test that asserts exactly that.</p>
+<ol>
+  <li>Heal any paid card expense that has no <code>repaymentDate</code> (persist the fallback, don't re-guess it on every read)</li>
+  <li>Index splits and participant repayments once — the naive version rescanned both boxes per expense</li>
+  <li>Sum <code>net</code> per month by accounting date</li>
+  <li>Write <code>totalExpenses</code> for every month (zeroing months that no longer have any)</li>
+  <li><code>rebuildCarryOverChain()</code></li>
+</ol>
+
+<div class="note">
+  <strong>The incremental path chains too</strong>
+  <code>_updateMonthlyExpenses()</code> (add / edit / delete / mark-paid) also calls <code>rebuildCarryOverChain()</code>. Rebuilding only inside <code>reconcile</code> would leave later months stale until the next restart — the same class of bug in a new costume.
+</div>
+</section>
+
+<section id="data">
+<h2 class="sec">Data model</h2>
+
+<p>Five Hive types. <code>typeId</code> and field indices are permanent — <strong>never renumber them</strong>; existing installs decode by number.</p>
+
+<h3>ExpenseModel <span class="pill">typeId 0</span></h3>
+<div class="scroll">
+<table>
+  <tr><th>#</th><th>Field</th><th>Type</th><th>Notes</th></tr>
+  <tr><td>0</td><td><code>id</code></td><td>String</td><td>uuid v4, assigned by the repository</td></tr>
+  <tr><td>1</td><td><code>name</code></td><td>String</td><td></td></tr>
+  <tr><td>2</td><td><code>amount</code></td><td>double</td><td>Gross. What you paid, before any repayment.</td></tr>
+  <tr><td>3</td><td><code>date</code></td><td>DateTime</td><td>When it happened — <em>not</em> necessarily the month it counts in</td></tr>
+  <tr><td>4</td><td><code>categoryId</code></td><td>String</td><td>→ CategoryModel.id</td></tr>
+  <tr><td>5</td><td><code>createdAt</code></td><td>DateTime</td><td></td></tr>
+  <tr><td>6</td><td><code>paymentMethod</code></td><td>String</td><td><code>'cash'</code> (default) | <code>'credit_card'</code></td></tr>
+  <tr><td>7</td><td><code>creditCardName</code></td><td>String?</td><td>Grouped case-insensitively on the Credit Cards screen</td></tr>
+  <tr><td>8</td><td><code>repaymentStatus</code></td><td>String</td><td><code>'none'</code> | <code>'pending'</code> | <code>'paid'</code></td></tr>
+  <tr><td>9</td><td><code>repaymentDate</code></td><td>DateTime?</td><td>When you paid the card. Drives the accounting month.</td></tr>
+  <tr><td>10</td><td><code>isDeleted</code></td><td>bool</td><td>Soft delete</td></tr>
+</table>
+</div>
+<p>Getters: <code>isCreditCard</code>, <code>isPending</code>, <code>isPaid</code>. Note <code>copyWith</code> cannot change <code>id</code> or <code>createdAt</code>.</p>
+
+<h3>MonthlyBalanceModel <span class="pill">typeId 1</span></h3>
+<div class="scroll">
+<table>
+  <tr><th>#</th><th>Field</th><th>Type</th><th>Notes</th></tr>
+  <tr><td>0</td><td><code>id</code></td><td>String</td><td><strong>Also the box key</strong>, format <code>"YYYY-MM"</code></td></tr>
+  <tr><td>1</td><td><code>salary</code></td><td>double</td><td></td></tr>
+  <tr><td>2</td><td><code>carryOver</code></td><td>double</td><td><em>Derived cache</em> — rewritten by the chain. Never assign it directly.</td></tr>
+  <tr><td>3</td><td><code>totalExpenses</code></td><td>double</td><td><em>Derived cache</em> — rewritten by reconcile.</td></tr>
+  <tr><td>4</td><td><code>carryOverAdjustment</code></td><td>double</td><td>Your manual correction, as a delta. The only user-owned field of the three.</td></tr>
+</table>
+</div>
+<p>Getters: <code>availableBalance = salary + carryOver</code>, <code>remainingBalance = availableBalance − totalExpenses</code>.</p>
+
+<h3>ExpenseSplitModel <span class="pill">typeId 3</span></h3>
+<div class="scroll">
+<table>
+  <tr><th>#</th><th>Field</th><th>Type</th><th>Notes</th></tr>
+  <tr><td>0</td><td><code>id</code></td><td>String</td><td></td></tr>
+  <tr><td>1</td><td><code>expenseId</code></td><td>String</td><td>→ ExpenseModel.id (no FK enforcement)</td></tr>
+  <tr><td>2</td><td><code>totalAmount</code></td><td>double</td><td></td></tr>
+  <tr><td>3</td><td><code>createdAt</code></td><td>DateTime</td><td></td></tr>
+  <tr><td>4</td><td><code>splitMethod</code></td><td>String</td><td><code>'equal'</code> | <code>'custom'</code></td></tr>
+  <tr><td>5</td><td><code>slipPersonId</code></td><td>String?</td><td>The participant who fronted the bill. <strong>If null, netting is skipped entirely.</strong></td></tr>
+</table>
+</div>
+
+<h3>SplitParticipantModel <span class="pill">typeId 4</span></h3>
+<div class="scroll">
+<table>
+  <tr><th>#</th><th>Field</th><th>Type</th><th>Notes</th></tr>
+  <tr><td>0</td><td><code>id</code></td><td>String</td><td>Preserved across edits — an expense edit deletes and recreates the split</td></tr>
+  <tr><td>1</td><td><code>splitId</code></td><td>String</td><td>→ ExpenseSplitModel.id</td></tr>
+  <tr><td>2</td><td><code>name</code></td><td>String</td><td></td></tr>
+  <tr><td>3</td><td><code>amount</code></td><td>double</td><td>This person's share</td></tr>
+  <tr><td>4</td><td><code>isPaid</code></td><td>bool</td><td>Drives the netting</td></tr>
+  <tr><td>5</td><td><code>paidAt</code></td><td>DateTime?</td><td>Display only — shown in the "Split settled" label. Does <em>not</em> move the accounting month.</td></tr>
+  <tr><td>6</td><td><code>isSlipPayer</code></td><td>bool</td><td>You. Excluded from netting — you can't repay yourself.</td></tr>
+</table>
+</div>
+
+<h3>CategoryModel <span class="pill">typeId 2</span></h3>
+<p>Fields: <code>id</code>, <code>name</code>, <code>emoji</code>, <code>isCustom</code>. Ten defaults are seeded on first launch (food, transport, shopping, entertainment, housing, healthcare, bills, education, travel, other). Non-custom categories silently refuse edit and delete.</p>
+
+<h3>CurrencyConfig <span class="pill">not a Hive type</span></h3>
+<p>A plain immutable class with a static list of 28 currencies. Only the code string is persisted, in SharedPreferences under <code>selected_currency</code>. <code>fromCode()</code> falls back to USD.</p>
+</section>
+
+<section id="storage">
+<h2 class="sec">Storage &amp; migrations</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>Box</th><th>Value</th><th>Key</th></tr>
+  <tr><td><code>expenses</code></td><td>ExpenseModel</td><td><code>id</code></td></tr>
+  <tr><td><code>monthly_balance</code></td><td>MonthlyBalanceModel</td><td><code>"YYYY-MM"</code></td></tr>
+  <tr><td><code>categories</code></td><td>CategoryModel</td><td><code>id</code></td></tr>
+  <tr><td><code>expense_splits</code></td><td>ExpenseSplitModel</td><td><code>id</code></td></tr>
+  <tr><td><code>split_participants</code></td><td>SplitParticipantModel</td><td><code>id</code></td></tr>
+</table>
+</div>
+
+<p><span class="file">hive_storage.dart</span> opens all five with a backoff retry (<code>0, 300, 800, 1600 ms</code>) — but <em>only</em> for lock errors, which happen when a previous process still holds the file. Any other error rethrows immediately.</p>
+
+<h3>There is no migration framework — <code>defaultValue</code> is the migration</h3>
+<p>To add a field to an existing model:</p>
+<pre><code>@HiveField(4, defaultValue: 0.0)   // next unused index; defaultValue REQUIRED
+double carryOverAdjustment;</code></pre>
+<p>Then re-run build_runner. The generator emits a null-safe read for that field:</p>
+<pre><code>carryOverAdjustment: fields[4] == null ? 0.0 : fields[4] as double,</code></pre>
+<p>Records written before the field existed decode as the default instead of throwing on a non-null cast. Omit <code>defaultValue</code> and every existing install crashes on first read.</p>
+
+<h3>The v2 balance migration</h3>
+<p><span class="file">balance_migration.dart</span>, guarded by the <code>balances_migrated_v2</code> SharedPreferences flag.</p>
+<p>Before the carry-over chain existed, <code>carryOver</code> was a snapshot written once when a month was first opened. The chain now derives it — which means the <em>earliest</em> month, having no predecessor, would rebuild to just its adjustment (0) and silently lose its opening balance. So on first launch after upgrading, the migration:</p>
+<ol>
+  <li>Exports a JSON backup to Downloads (a failure here is reported, not fatal — see below)</li>
+  <li>Seeds the earliest month's <code>carryOverAdjustment</code> from its stored <code>carryOver</code></li>
+  <li>Sets the flag, and shows "Balances recalculated" on the dashboard</li>
+</ol>
+
+<div class="danger">
+  <strong>Ordering is not negotiable</strong>
+  The migration must run <em>before</em> the first <code>reconcileMonthlyExpenses()</code> of the process. Once the chain has zeroed the earliest month's <code>carryOver</code>, there is nothing left to seed from and the opening balance is gone for good. That's why a failed backup does not abort the seed.
+  <br><br>
+  Only the earliest month is seeded, deliberately. Seeding later months would preserve their frozen (wrong) values as permanent adjustments and defeat the entire fix.
+</div>
+
+<h3>Export &amp; import</h3>
+<p><span class="file">data_export_import.dart</span></p>
+<ul>
+  <li><strong>JSON</strong> — map-driven, so it picks up new model fields automatically once <code>toMap</code>/<code>fromMap</code> know about them.</li>
+  <li><strong>Excel</strong> — read <strong>positionally</strong>. New columns must be <em>appended</em>; inserting one silently corrupts every field after it. Readers guard on <code>row.length</code> so older backups still import.</li>
+  <li>Both paths finish with a full reconcile.</li>
+  <li>Android saves via a <code>MethodChannel</code> to MediaStore; elsewhere it falls back to <code>path_provider</code>.</li>
+</ul>
+
+<div class="warn">
+  <strong>Import is destructive, not additive</strong>
+  <code>_deleteMissingKeys()</code> removes any record not present in the imported file. Importing a backup makes your data <em>match</em> that file — it does not merge.
+</div>
+</section>
+
+<section id="f-entry">
+<h2 class="sec">File reference — entry &amp; core</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
+  <tr><td><code>main.dart</code></td><td>122</td><td>Entry. <code>main()</code> is sync; <code>_AppWithSplash</code> does async init in <code>initState</code>: Hive → <strong>migration</strong> → reconcile → SharedPreferences. Renders a splash, or an error card with a working Retry.</td></tr>
+  <tr><td><code>app.dart</code></td><td>24</td><td><code>MaterialApp</code>; watches <code>themeProvider</code>, installs light/dark themes, <code>home: HomeShell()</code>.</td></tr>
+  <tr><td><code>core/theme/app_theme.dart</code></td><td>240</td><td>The whole visual system: seed-derived <code>ColorScheme</code>, a real <code>TextTheme</code>, and component themes (card, appbar, navbar, FAB, input, dialog, sheet, chip, divider). Also <code>MoneyText</code> — amount styles with tabular figures so columns don't jitter.</td></tr>
+  <tr><td><code>core/theme/money_colors.dart</code></td><td>140</td><td><code>MoneyColors</code> ThemeExtension: positive / negative / pending / settled, each with container pairs, in light and dark variants. <code>context.money</code> is the accessor; <code>forBalance(x)</code> picks by sign.</td></tr>
+  <tr><td><code>core/constants/app_colors.dart</code></td><td>9</td><td>Seed colour constants. Only <code>primary</code> is still used for theming — prefer <code>MoneyColors</code> for anything semantic.</td></tr>
+  <tr><td><code>core/constants/app_spacing.dart</code></td><td>8</td><td>Spacing scale: xs 4 → xxl 48.</td></tr>
+  <tr><td><code>core/constants/app_strings.dart</code></td><td>34</td><td>UI strings. Not exhaustive — many literals still sit inline in screens.</td></tr>
+  <tr><td><code>core/utils/date_utils.dart</code></td><td>35</td><td><code>formatMonthKey()</code> → <code>"yyyy-MM"</code> — <strong>this is the balance box key</strong>. Also display/date/time formatters and <code>endOfMonth</code>.</td></tr>
+  <tr><td><code>core/utils/currency_formatter.dart</code></td><td>12</td><td><code>NumberFormat.currency</code> wrapper driven by <code>CurrencyConfig</code>.</td></tr>
+</table>
+</div>
+</section>
+
+<section id="f-data">
+<h2 class="sec">File reference — data layer</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
+  <tr><td><code>datasources/hive_storage.dart</code></td><td>131</td><td>Hive init, adapter registration (guarded), box opening with lock-aware retry, default category seeding. Exposes <code>*BoxRef</code> getters used by every repository.</td></tr>
+  <tr><td><code>repositories/expense_repository.dart</code></td><td>366</td><td><strong>The most important file in the app.</strong> Expense CRUD, soft delete, <code>getAccountingDate</code>, <code>getNetSplitAmount</code>/<code>getCountedAmount</code>, <code>reconcileMonthlyExpenses</code>, <code>getAccountingExpensesByMonth</code>, <code>getAccountingDaysWithExpenses</code>.</td></tr>
+  <tr><td><code>repositories/balance_repository.dart</code></td><td>106</td><td>Month balance CRUD, <code>rebuildCarryOverChain</code>, <code>setCarryOverForMonth</code> (records the adjustment), <code>clearCarryOverAdjustment</code>, <code>calculatedCarryOverFor</code>.</td></tr>
+  <tr><td><code>repositories/split_repository.dart</code></td><td>162</td><td><code>createSplit</code> (writes split → participants → back-patches <code>slipPersonId</code> with the real generated id), mark/unmark paid, outstanding calculations.</td></tr>
+  <tr><td><code>repositories/category_repository.dart</code></td><td>50</td><td>Category CRUD. Defaults sort first; edit/delete no-op on non-custom.</td></tr>
+  <tr><td><code>services/balance_migration.dart</code></td><td>76</td><td>The one-time v2 migration — backup, seed the earliest month, set the flag. See <a href="#storage">Storage</a>.</td></tr>
+  <tr><td><code>services/data_export_import.dart</code></td><td>519</td><td>JSON + Excel backup/restore, Android MediaStore channel, file picking. Import is destructive and ends in a reconcile.</td></tr>
+  <tr><td><code>models/*.dart</code></td><td>—</td><td>Five Hive models + <code>CurrencyConfig</code>. See <a href="#data">Data model</a>. Each has a generated <code>.g.dart</code> adapter — never hand-edit those.</td></tr>
+</table>
+</div>
+</section>
+
+<section id="f-providers">
+<h2 class="sec">File reference — providers</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
+  <tr><td><code>expense_provider.dart</code></td><td>267</td><td><code>ExpenseNotifier</code> — CRUD, <code>markAsPaid</code>/<code>markCardAsPaid</code> (normalises card names: trim + lowercase, blank → "unknown card"), and thin pass-throughs for the accounting methods screens need.</td></tr>
+  <tr><td><code>balance_provider.dart</code></td><td>93</td><td><code>BalanceNotifier</code> — <code>loadBalance</code>, salary/carry-over edits, <code>clearCarryOverAdjustment</code>, <code>calculatedCarryOver</code>. <code>BalanceState</code> exposes current-month conveniences.</td></tr>
+  <tr><td><code>split_provider.dart</code></td><td>138</td><td><code>SplitNotifier</code>. Every mutation funnels through <code>_refreshAccounting()</code> → reconcile + balance refresh. <strong>This is the path that makes a settled split reach the dashboard.</strong></td></tr>
+  <tr><td><code>category_provider.dart</code></td><td>60</td><td>Category list state.</td></tr>
+  <tr><td><code>currency_provider.dart</code></td><td>27</td><td>Currency, persisted to SharedPreferences.</td></tr>
+  <tr><td><code>theme_provider.dart</code></td><td>24</td><td><code>ThemeMode</code>, default <code>system</code>.</td></tr>
+  <tr><td><code>payer_name_provider.dart</code></td><td>25</td><td>Your display name on splits.</td></tr>
+  <tr><td><code>calendar_provider.dart</code></td><td>33</td><td>Focused/selected day.</td></tr>
+  <tr><td><code>migration_notice_provider.dart</code></td><td>5</td><td>One-shot post-migration message, consumed and cleared by <code>HomeShell</code>.</td></tr>
+</table>
+</div>
+</section>
+
+<section id="f-screens">
+<h2 class="sec">File reference — screens &amp; widgets</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
+  <tr><td><code>home/home_shell.dart</code></td><td>100</td><td>3-tab <code>IndexedStack</code> + <code>NavigationBar</code>. FAB is on every tab. Shows the migration notice on first frame.</td></tr>
+  <tr><td><code>dashboard/dashboard_screen.dart</code></td><td>129</td><td>Tab 0. Balance card, chart, nav cards to Credit Cards / Splits, recent expenses. Computes <code>creditPending</code> with <code>getNetSplitAmount</code>.</td></tr>
+  <tr><td><code>dashboard/widgets/balance_card.dart</code></td><td>275</td><td>Hero remaining figure (animated), spend meter, salary + carry-over rows (with provenance), and two stat tiles. All colours from <code>context.money</code>.</td></tr>
+  <tr><td><code>dashboard/widgets/monthly_chart.dart</code></td><td>181</td><td>Daily bars via fl_chart, bucketed by <strong>accounting date</strong> and summed with <code>getCountedAmount</code>, plus a daily-budget reference line. Bars sum to the balance card's total.</td></tr>
+  <tr><td><code>dashboard/widgets/recent_expenses_list.dart</code></td><td>152</td><td>Latest few expenses.</td></tr>
+  <tr><td><code>calendar/calendar_screen.dart</code></td><td>236</td><td>Tab 1. <code>table_calendar</code> with markers bucketed by accounting date; tapping a day passes the already-bucketed list to the sheet rather than re-querying.</td></tr>
+  <tr><td><code>calendar/widgets/day_expense_sheet.dart</code></td><td>141</td><td>One day's expenses.</td></tr>
+  <tr><td><code>expenses/expense_list_screen.dart</code></td><td>267</td><td>Tab 2. All-time ledger with an Active/Deleted toggle. <strong>Deliberately gross, by transaction date</strong> — it's a ledger, not a budget view. See the note below.</td></tr>
+  <tr><td><code>expenses/widgets/expense_item.dart</code></td><td>190</td><td>Shared row. <code>amountOverride</code>, <code>statusLabels</code> (0..n chips), <code>detailText</code>. Pending card amounts render amber, not red.</td></tr>
+  <tr><td><code>month_summary/month_summary_screen.dart</code></td><td>348</td><td>Per-month breakdown. Uses <code>getAccountingExpensesByMonth</code> + <code>getCountedAmount</code>; labels the carry-over row with its source month.</td></tr>
+  <tr><td><code>month_summary/widgets/monthly_expense_list.dart</code></td><td>180</td><td>Groups by accounting date. Emits "Credit paid this month" / "Split settled" chips and the explanatory detail line.</td></tr>
+  <tr><td><code>month_summary/widgets/summary_chart.dart</code></td><td>132</td><td>Category breakdown chart.</td></tr>
+  <tr><td><code>credit_cards/credit_card_screen.dart</code></td><td>509</td><td>Cards grouped by name, pending/paid segments, single + bulk "mark card paid". All totals net of splits.</td></tr>
+  <tr><td><code>splits/split_summary_screen.dart</code></td><td>238</td><td>Outstanding splits; mark/unmark participants paid. Mutations go through <code>SplitNotifier</code>, which reconciles centrally.</td></tr>
+  <tr><td><code>add_expense/add_expense_sheet.dart</code></td><td>398</td><td>Add <strong>and</strong> edit. Owns submit logic. Preserves card repayment state and participant identity across edits.</td></tr>
+  <tr><td><code>add_expense/widgets/expense_form.dart</code></td><td>461</td><td>The form fields, split toggle, participant rows, ±0.01 sum validation.</td></tr>
+  <tr><td><code>add_expense/widgets/participant_entry.dart</code></td><td>29</td><td>Form-side DTO. Carries <code>id</code> and <code>paidAt</code> so an edit round-trip doesn't destroy settlements.</td></tr>
+  <tr><td><code>add_expense/widgets/category_selector.dart</code></td><td>50</td><td>Emoji category chips.</td></tr>
+  <tr><td><code>settings/settings_screen.dart</code></td><td>574</td><td>Payer name, income, theme, currency, categories, export/import.</td></tr>
+  <tr><td><code>widgets/common/income_dialogs.dart</code></td><td>117</td><td>Salary + carry-over dialogs. The carry-over dialog shows the calculated value and offers "Use calculated" to clear an adjustment.</td></tr>
+  <tr><td><code>widgets/common/empty_state.dart</code></td><td>37</td><td>Shared empty placeholder.</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <strong>Why the expense list is intentionally different</strong>
+  Every other money surface uses accounting dates and counted amounts. The expense list does not — on purpose. It isn't month-scoped (it queries all time), so it can't contradict the balance card; and switching it to accounting semantics would make every <em>pending</em> card expense vanish from the list, deleting the very rows you go there to manage. It's a transaction ledger: transaction amount, at transaction date. Its day totals say "Spent", not "Total", for the same reason.
+</div>
+</section>
+
+<section id="testing">
+<h2 class="sec">Testing</h2>
+
+<p><code>flutter test</code> — 24 tests across two files. Each seeds a temp Hive directory, registers adapters, opens boxes, and tears down.</p>
+<ul>
+  <li><code>test/expense_credit_card_test.dart</code> — 22 accounting tests, run on the Dart VM.</li>
+  <li><code>test/dashboard_settlement_flow_test.dart</code> — 2 widget tests driving the dashboard end-to-end.</li>
+</ul>
+
+<div class="warn">
+  <strong>Two rules for widget tests here, both learned the hard way</strong>
+  <ol style="margin:6px 0 0">
+    <li><strong>Wrap every Hive call in <code>tester.runAsync()</code>.</strong> <code>testWidgets</code> runs its body in a fake-async zone; Hive does real file I/O, so those futures never complete and the test hangs until timeout with a bare "did not complete".</li>
+    <li><strong>Don't use <code>pumpAndSettle()</code> on the dashboard</strong> — it never reaches a quiescent frame, so settling spins out. Use bounded <code>pump(Duration)</code> calls.</li>
+  </ol>
+</div>
+
+<h4>What's covered</h4>
+<ul>
+  <li><strong>Credit repayment month</strong> — single and bulk card payment land in the repayment month; undo removes them from it; card-name normalisation; reconcile re-homes existing paid expenses.</li>
+  <li><strong>Carry-over chain</strong> — propagation, negative roll-forward, gap months, earliest-month opening balance, idempotence, and the incremental path chaining without a reconcile.</li>
+  <li><strong>Splits</strong> — settling reduces the original month; undo restores it; <strong>settling a previous month's split raises this month's remaining</strong> (the headline regression test); a manual adjustment survives a later settlement; edit round-trips preserve participant id and <code>paidAt</code>.</li>
+  <li><strong>Soft delete</strong> — striking out an expense updates its month.</li>
+</ul>
+
+<div class="warn">
+  <strong>Three tests assert on source text, not behaviour</strong>
+  The first three read screen <code>.dart</code> files off disk and assert on substrings (e.g. <code>expect(summarySource, isNot(contains('+ expense.amount')))</code>). They break on a reformat and pass on a rename, they depend on the CWD being the repo root, and they give false confidence that the UI is covered. Replace them with behavioural tests as those screens change; don't extend the pattern.
+</div>
+
+<div class="ok">
+  <strong>The headline regression test</strong>
+  <code>dashboard remaining rises when a previous month split settles</code> reproduces the original bug through the real widget tree: front a split last month, settle it this month, and this month's remaining must rise with no restart. It fails on the pre-fix code.
+</div>
+</section>
+
+<section id="build">
+<h2 class="sec">Build &amp; publish</h2>
+
+<pre><code>flutter clean &amp;&amp; flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+
+# Play Store bundle
+flutter build appbundle --obfuscate --split-debug-info=build/debug-info
+#   → build/app/outputs/bundle/release/app-release.aab
+
+# Direct-distribution APK
+flutter build apk --obfuscate --split-debug-info=build/debug-info --split-per-abi</code></pre>
+
+<div class="scroll">
+<table>
+  <tr><th>Setting</th><th>Value</th><th>Where</th></tr>
+  <tr><td>applicationId</td><td><code>com.example.expense_tracker</code> <span class="pill">blocker</span></td><td><code>android/app/build.gradle</code></td></tr>
+  <tr><td>minSdk / targetSdk / compileSdk</td><td>33 / 34 / 34</td><td><code>android/app/build.gradle</code></td></tr>
+  <tr><td>Release signing</td><td><code>signingConfigs.debug</code> <span class="pill">blocker</span></td><td><code>android/app/build.gradle</code></td></tr>
+  <tr><td>Minify / shrink</td><td>enabled (R8 + ProGuard)</td><td><code>proguard-rules.pro</code></td></tr>
+  <tr><td>Permissions</td><td><strong>none</strong> — no INTERNET</td><td><code>AndroidManifest.xml</code></td></tr>
+  <tr><td>Backup</td><td><code>allowBackup=false</code></td><td><code>AndroidManifest.xml</code></td></tr>
+</table>
+</div>
+
+<p><code>PUBLISH_CHECKLIST.md</code> at the repo root has the full Play Console walkthrough — keystore generation, the signing config to paste into <code>build.gradle</code>, store listing requirements, and the data-safety answers (the app collects nothing and sends nothing).</p>
+</section>
+
+<section id="issues">
+<h2 class="sec">Known issues</h2>
+
+<h3>Blocks release</h3>
+<ul>
+  <li><strong>Release builds are signed with the debug key.</strong> <code>build.gradle</code> still has <code>signingConfig signingConfigs.debug</code> in the release block. Play will reject it. Checklist Step 4 has the fix.</li>
+  <li><strong>Package is still <code>com.example.expense_tracker</code></strong> — <code>com.example.*</code> cannot be published, and the id is permanent once live. Same for the iOS bundle id <code>com.example.expenseTracker</code>.</li>
+</ul>
+
+<h3>Platform limits</h3>
+<ul>
+  <li><strong>The web target cannot compile</strong> despite <code>web/</code> existing — <code>data_export_import.dart</code> imports <code>dart:io</code>.</li>
+  <li><strong>Desktop export is untested.</strong> The MediaStore <code>MethodChannel</code> is implemented only in <code>MainActivity.kt</code>; other platforms fall back to <code>path_provider</code>.</li>
+  <li><strong>The dashboard never settles</strong> under the test binding — something on it schedules frames indefinitely. It doesn't affect the app, but it means <code>pumpAndSettle()</code> can't be used there. Worth tracking down.</li>
+</ul>
+
+<div class="ok">
+  <strong>Fixed: the win32 build break</strong>
+  The stale <code>sdk: '&gt;=3.2.3'</code> floor forced pub to resolve <code>win32 5.2.0</code>, which calls <code>UnmodifiableUint8ListView</code> — removed in Dart 3.4. It broke <code>flutter build windows</code> and every test that imported a screen. Resolved by raising the SDK floor to 3.4.0 and upgrading <code>file_picker</code> 6 → 11 (which made <code>FilePicker</code> static: <code>FilePicker.pickFiles()</code>, no more <code>.platform</code>).
+</div>
+
+<h3>Design limits</h3>
+<ul>
+  <li><strong>A "month" is always a calendar month</strong>, in device-local time. There is no payday or cycle-start setting. If you're paid on the 25th, the app can't model that.</li>
+  <li><strong><code>setMonthSalary(monthKey, ...)</code> exists but nothing calls it</strong> — salary is only editable for the current month, so backfilling an old month's salary isn't reachable from the UI.</li>
+  <li><strong>Split amounts aren't validated on import.</strong> The add-expense form checks participants sum to the total (±0.01), but a hand-edited backup can bypass it. Netting floors at 0, so an overpayment silently vanishes rather than becoming a credit.</li>
+  <li><strong><code>paidAt</code> doesn't move the accounting month.</strong> A split settled in June reduces May — deliberately, so past months stay truthful — with the UI labelling it. Its credit-card sibling (<code>repaymentDate</code>) works the opposite way. That asymmetry is intentional but surprising.</li>
+  <li><strong>No localization.</strong> All UI text is hardcoded English; <code>intl</code> is used only for number/date formatting. Currency locales affect formatting, not language.</li>
+</ul>
+</section>
+
+</main>
+</div>
+</body>
+</html>

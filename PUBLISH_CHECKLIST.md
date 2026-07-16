@@ -155,9 +155,14 @@ flutter build apk --debug
 ```
 
 ## Files to Delete Before Publishing
-- [ ] `README.md` → already deleted
-- [ ] `PRIVACY_POLICY.md` → already deleted
 - [x] `lib/routes/` → empty directory (already deleted)
+
+Nothing else needs deleting. `README.md` and `docs/index.html` are developer
+documentation — they are not bundled into the APK/AAB (only `assets/` declared in
+`pubspec.yaml` ships), so they cost nothing at publish time. Keep them.
+
+`PRIVACY_POLICY.md` was deleted, but note the Prerequisites above still require a
+**hosted** privacy policy URL for the Play listing.
 
 ## Security Checklist
 - [x] No internet permission in AndroidManifest
