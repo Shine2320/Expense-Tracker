@@ -83,7 +83,7 @@ class RecentExpensesList extends ConsumerWidget {
                         decoration:
                             isDeleted ? TextDecoration.lineThrough : null,
                         color: isDeleted
-                            ? colorScheme.onSurface.withOpacity(0.4)
+                            ? colorScheme.onSurface.withValues(alpha: 0.4)
                             : null,
                       ),
                     ),
@@ -120,7 +120,7 @@ class RecentExpensesList extends ConsumerWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isDeleted
-                            ? colorScheme.onSurface.withOpacity(0.3)
+                            ? colorScheme.onSurface.withValues(alpha: 0.3)
                             : colorScheme.error,
                         decoration:
                             isDeleted ? TextDecoration.lineThrough : null,

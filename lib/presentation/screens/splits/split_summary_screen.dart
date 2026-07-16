@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/expense_split_model.dart';
 import '../../../data/models/expense_model.dart';
@@ -6,7 +7,11 @@ import '../../../data/models/split_participant_model.dart';
 import '../../providers/split_provider.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../widgets/common/empty_state.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/money_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/date_utils.dart' as utils;
 import '../../../core/constants/app_spacing.dart';
 
 class SplitSummaryScreen extends ConsumerWidget {
@@ -34,19 +39,11 @@ class SplitSummaryScreen extends ConsumerWidget {
         title: const Text('Split Payments'),
       ),
       body: splitGroups.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.people_outline,
-                      size: 64, color: colorScheme.outline),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'No split payments',
-                    style: TextStyle(color: colorScheme.outline, fontSize: 16),
-                  ),
-                ],
-              ),
+          ? const EmptyState(
+              icon: Icons.people_outline,
+              message: 'No split payments',
+              hint: 'When you add an expense, turn on "Split" to track what '
+                  'others owe you. Only your share counts against your salary.',
             )
           : ListView.builder(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -146,22 +143,22 @@ class SplitSummaryScreen extends ConsumerWidget {
                                   Text(
                                     CurrencyFormatter.format(
                                         participant.amount, currency),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.error,
+                                    style: MoneyText.medium(context).copyWith(
+                                      color: context.money.pending,
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  IconButton(
-                                    icon: Icon(Icons.check_circle_outline,
-                                        color: colorScheme.primary),
+                                  IconButton.filledTonal(
+                                    icon: const Icon(
+                                        Icons.check_circle_outline, size: 20),
                                     onPressed: () async {
+                                      HapticFeedback.selectionClick();
                                       await ref
                                           .read(splitProvider.notifier)
                                           .markParticipantAsPaid(
                                               participant.id);
                                     },
-                                    tooltip: 'Mark as Paid',
+                                    tooltip: 'Mark as paid',
                                   ),
                                 ],
                               ),
@@ -194,19 +191,22 @@ class SplitSummaryScreen extends ConsumerWidget {
                                 style: const TextStyle(
                                     decoration: TextDecoration.lineThrough),
                               ),
-                              subtitle: slipParticipant.name.isNotEmpty
-                                  ? Text('Paid back ${slipParticipant.name}')
-                                  : const Text('Paid'),
+                              // Name the date: settling this retroactively
+                              // changed the month the expense was paid in.
+                              subtitle: Text(
+                                participant.paidAt != null
+                                    ? 'Repaid ${utils.DateUtils.formatDisplayDate(participant.paidAt!)}'
+                                    : 'Repaid',
+                              ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     CurrencyFormatter.format(
                                         participant.amount, currency),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
+                                    style: MoneyText.medium(context).copyWith(
                                       color: colorScheme.onSurface
-                                          .withOpacity(0.3),
+                                          .withValues(alpha: 0.35),
                                       decoration: TextDecoration.lineThrough,
                                     ),
                                   ),

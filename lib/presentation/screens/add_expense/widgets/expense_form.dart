@@ -228,33 +228,31 @@ class ExpenseForm extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
             ),
             if (isSplit) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Equal'),
-                      value: 'equal',
-                      groupValue: splitMethod,
-                      onChanged: (value) {
-                        if (value != null) onSplitMethodChanged(value);
-                      },
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+              RadioGroup<String>(
+                groupValue: splitMethod,
+                onChanged: (value) {
+                  if (value != null) onSplitMethodChanged(value);
+                },
+                child: const Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text('Equal'),
+                        value: 'equal',
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text('Custom'),
-                      value: 'custom',
-                      groupValue: splitMethod,
-                      onChanged: (value) {
-                        if (value != null) onSplitMethodChanged(value);
-                      },
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: Text('Custom'),
+                        value: 'custom',
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               // ── Feature 3: Slip Person Toggle (default ON) ──
               SwitchListTile(
@@ -274,7 +272,7 @@ class ExpenseForm extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: colorScheme.secondaryContainer.withOpacity(0.3),
+                    color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: colorScheme.outlineVariant),
                   ),
