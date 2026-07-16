@@ -8,6 +8,22 @@ import '../models/split_participant_model.dart';
 import '../../core/utils/date_utils.dart' as utils;
 import 'balance_repository.dart';
 
+/// A snapshot of the split lookups needed to price expenses.
+///
+/// Build it once per pass (a reconcile, a widget build) rather than caching it
+/// on the repository: `expenseRepositoryProvider` is a plain `Provider`, so the
+/// repository lives for the whole session and a cache there would go stale the
+/// moment a split is settled.
+class SplitAccountingIndex {
+  final Map<String, ExpenseSplitModel> splitsByExpenseId;
+  final Map<String, double> collectedBySplitId;
+
+  const SplitAccountingIndex({
+    required this.splitsByExpenseId,
+    required this.collectedBySplitId,
+  });
+}
+
 class ExpenseRepository {
   static const _uuid = Uuid();
 
@@ -239,31 +255,15 @@ class ExpenseRepository {
   Future<void> reconcileMonthlyExpenses() async {
     await _healMissingRepaymentDates();
 
-    // Index once instead of rescanning both boxes per expense.
-    final splitsByExpenseId = <String, ExpenseSplitModel>{
-      for (final split in _splitBox.values) split.expenseId: split,
-    };
-    final collectedBySplitId = <String, double>{};
-    for (final participant in _participantBox.values) {
-      if (participant.isSlipPayer || !participant.isPaid) continue;
-      collectedBySplitId[participant.splitId] =
-          (collectedBySplitId[participant.splitId] ?? 0) + participant.amount;
-    }
-
+    final index = buildSplitIndex();
     final totalsByMonth = <String, double>{};
     for (final expense in _box.values) {
       final accountingDate = getAccountingDate(expense);
       if (accountingDate == null) continue;
 
-      final split = splitsByExpenseId[expense.id];
-      final netAmount = _netAmountFrom(
-        expense,
-        split,
-        split == null ? 0 : collectedBySplitId[split.id] ?? 0,
-      );
-
       final monthKey = utils.DateUtils.formatMonthKey(accountingDate);
-      totalsByMonth[monthKey] = (totalsByMonth[monthKey] ?? 0) + netAmount;
+      totalsByMonth[monthKey] =
+          (totalsByMonth[monthKey] ?? 0) + netSplitAmountWith(expense, index);
     }
 
     for (final balance in _balanceBox.values) {
@@ -295,6 +295,43 @@ class ExpenseRepository {
         await expense.save();
       }
     }
+  }
+
+  /// Builds the expense→split and split→collected lookups in a single pass.
+  ///
+  /// [getNetSplitAmount] linear-scans both boxes for one expense, which is fine
+  /// once but O(n·m) when called per row. Build this once and hand it to
+  /// [netSplitAmountWith] / [countedAmountWith] instead.
+  SplitAccountingIndex buildSplitIndex() {
+    final splitsByExpenseId = <String, ExpenseSplitModel>{
+      for (final split in _splitBox.values) split.expenseId: split,
+    };
+    final collectedBySplitId = <String, double>{};
+    for (final participant in _participantBox.values) {
+      if (participant.isSlipPayer || !participant.isPaid) continue;
+      collectedBySplitId[participant.splitId] =
+          (collectedBySplitId[participant.splitId] ?? 0) + participant.amount;
+    }
+    return SplitAccountingIndex(
+      splitsByExpenseId: splitsByExpenseId,
+      collectedBySplitId: collectedBySplitId,
+    );
+  }
+
+  /// [getNetSplitAmount] against a prebuilt [index].
+  double netSplitAmountWith(ExpenseModel expense, SplitAccountingIndex index) {
+    final split = index.splitsByExpenseId[expense.id];
+    return _netAmountFrom(
+      expense,
+      split,
+      split == null ? 0 : index.collectedBySplitId[split.id] ?? 0,
+    );
+  }
+
+  /// [getCountedAmount] against a prebuilt [index].
+  double countedAmountWith(ExpenseModel expense, SplitAccountingIndex index) {
+    if (getAccountingDate(expense) == null) return 0;
+    return netSplitAmountWith(expense, index);
   }
 
   double getNetSplitAmount(ExpenseModel expense) {

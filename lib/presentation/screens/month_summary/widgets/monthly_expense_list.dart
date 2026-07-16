@@ -5,6 +5,8 @@ import '../../../../../core/utils/currency_formatter.dart';
 import '../../../../../core/utils/date_utils.dart' as utils;
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/category_model.dart';
+import '../../../../data/models/split_participant_model.dart';
+import '../../../../data/repositories/expense_repository.dart';
 import '../../../../presentation/providers/currency_provider.dart';
 import '../../../../presentation/providers/expense_provider.dart';
 import '../../../../presentation/providers/split_provider.dart';
@@ -33,6 +35,10 @@ class MonthlyExpenseList extends ConsumerWidget {
     final currency = ref.watch(currencyProvider);
     final groupedByDate = <String, List<ExpenseModel>>{};
     final expenseNotifier = ref.watch(expensesProvider.notifier);
+    // One pass over the split boxes for the whole list, rather than one per row.
+    final splitIndex = expenseNotifier.buildSplitIndex();
+    final participantsBySplitId =
+        ref.watch(splitProvider.notifier).participantsBySplitId();
 
     for (final expense in expenses) {
       final accountingDate =
@@ -77,7 +83,7 @@ class MonthlyExpenseList extends ConsumerWidget {
           final date = DateTime.parse(dateKey);
           final dayTotal = dateExpenses.fold<double>(
             0,
-            (sum, e) => sum + expenseNotifier.getCountedAmount(e),
+            (sum, e) => sum + expenseNotifier.countedAmountWith(e, splitIndex),
           );
 
           return Column(
@@ -123,8 +129,13 @@ class MonthlyExpenseList extends ConsumerWidget {
                 // A split settled later retroactively reduces this month's
                 // counted amount, so say so rather than letting a historical
                 // figure change unexplained.
-                final settlement = _settlementFor(ref, expense);
-                final countedAmount = expenseNotifier.getCountedAmount(expense);
+                final settlement = _settlementFor(
+                  expense,
+                  splitIndex,
+                  participantsBySplitId,
+                );
+                final countedAmount =
+                    expenseNotifier.countedAmountWith(expense, splitIndex);
 
                 final details = <String>[
                   if (isPreviousMonthCredit)
@@ -159,13 +170,18 @@ class MonthlyExpenseList extends ConsumerWidget {
 
   /// Returns what others have repaid on this expense's split, or null when the
   /// expense isn't a split the user fronted or nobody has settled yet.
-  _Settlement? _settlementFor(WidgetRef ref, ExpenseModel expense) {
-    final splitNotifier = ref.read(splitProvider.notifier);
-    final split = splitNotifier.getSplitByExpenseId(expense.id);
+  ///
+  /// Takes prebuilt lookups: resolving these per row rescans the split boxes
+  /// for every expense on screen.
+  _Settlement? _settlementFor(
+    ExpenseModel expense,
+    SplitAccountingIndex splitIndex,
+    Map<String, List<SplitParticipantModel>> participantsBySplitId,
+  ) {
+    final split = splitIndex.splitsByExpenseId[expense.id];
     if (split == null || split.slipPersonId == null) return null;
 
-    final settled = splitNotifier
-        .getParticipantsBySplitId(split.id)
+    final settled = (participantsBySplitId[split.id] ?? const [])
         .where((p) => !p.isSlipPayer && p.isPaid);
     if (settled.isEmpty) return null;
 

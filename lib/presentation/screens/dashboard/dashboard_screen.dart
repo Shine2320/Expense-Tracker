@@ -32,9 +32,13 @@ class DashboardScreen extends ConsumerWidget {
     // Deliberately getNetSplitAmount and not getCountedAmount — the latter is 0
     // for a pending card expense, which would render this as always zero.
     final expenseNotifier = ref.read(expensesProvider.notifier);
+    final splitIndex = expenseNotifier.buildSplitIndex();
     final creditPending = expenseState.expenses
         .where((e) => e.isCreditCard && e.isPending && !e.isDeleted)
-        .fold<double>(0, (sum, e) => sum + expenseNotifier.getNetSplitAmount(e));
+        .fold<double>(
+          0,
+          (sum, e) => sum + expenseNotifier.netSplitAmountWith(e, splitIndex),
+        );
 
     return Scaffold(
       appBar: AppBar(

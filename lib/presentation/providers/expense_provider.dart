@@ -264,4 +264,17 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   double getNetSplitAmount(ExpenseModel expense) {
     return _repository.getNetSplitAmount(expense);
   }
+
+  /// Build once per `build()` and pass to [countedAmountWith] /
+  /// [netSplitAmountWith] instead of calling the per-expense variants in a
+  /// loop, which rescan the split boxes for every row.
+  SplitAccountingIndex buildSplitIndex() => _repository.buildSplitIndex();
+
+  double countedAmountWith(ExpenseModel expense, SplitAccountingIndex index) {
+    return _repository.countedAmountWith(expense, index);
+  }
+
+  double netSplitAmountWith(ExpenseModel expense, SplitAccountingIndex index) {
+    return _repository.netSplitAmountWith(expense, index);
+  }
 }

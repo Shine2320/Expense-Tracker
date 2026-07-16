@@ -24,6 +24,18 @@ class SplitRepository {
     }
   }
 
+  /// Every split's participants, grouped in a single pass.
+  ///
+  /// [getParticipantsBySplitId] filters the whole box per call, which is O(n·p)
+  /// when a list needs it for every row. Build this once instead.
+  Map<String, List<SplitParticipantModel>> participantsBySplitId() {
+    final grouped = <String, List<SplitParticipantModel>>{};
+    for (final participant in _participantBox.values) {
+      (grouped[participant.splitId] ??= []).add(participant);
+    }
+    return grouped;
+  }
+
   List<SplitParticipantModel> getParticipantsBySplitId(String splitId) {
     return _participantBox.values.where((p) => p.splitId == splitId).toList()
       ..sort((a, b) {

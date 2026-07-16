@@ -30,37 +30,13 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  test('month summary does not call month-scoped provider loader', () {
-    final source = File(
-      'lib/presentation/screens/month_summary/month_summary_screen.dart',
-    ).readAsStringSync();
-
-    expect(source, isNot(contains('loadExpensesForMonth')));
-  });
-
-  test('month summary display uses counted split amounts', () {
-    final summarySource = File(
-      'lib/presentation/screens/month_summary/month_summary_screen.dart',
-    ).readAsStringSync();
-    final listSource = File(
-      'lib/presentation/screens/month_summary/widgets/monthly_expense_list.dart',
-    ).readAsStringSync();
-
-    expect(summarySource, contains('getCountedAmount(expense)'));
-    expect(summarySource, isNot(contains('+ expense.amount')));
-    expect(listSource, contains('getCountedAmount(e)'));
-    expect(listSource, contains('amountOverride'));
-  });
-
-  test('month summary labels credit payments from previous months', () {
-    final listSource = File(
-      'lib/presentation/screens/month_summary/widgets/monthly_expense_list.dart',
-    ).readAsStringSync();
-
-    expect(listSource, contains('Credit paid this month'));
-    expect(listSource, contains('Original expense:'));
-    expect(listSource, contains('formatDisplayDate(expense.date)'));
-  });
+  // The three source-text greps that used to live here (asserting the month
+  // summary files literally contained 'getCountedAmount(expense)' and friends)
+  // are gone. They asserted on source text rather than behaviour: they broke on
+  // a rename that made the code faster and did not change what a user sees, and
+  // they would have passed just as happily on a screen that rendered nothing.
+  // The behaviour they were reaching for is covered for real in
+  // test/month_summary_labels_test.dart.
 
   test('bulk card payment marks only pending expenses for that card', () async {
     final expenses = HiveStorage.expensesBoxRef;
@@ -908,6 +884,77 @@ void main() {
     // The incremental path must chain too, not wait for the next restart.
     expect(balances.get('2026-05')!.totalExpenses, 50);
     expect(balances.get('2026-06')!.carryOver, 950);
+  });
+
+  test('the indexed split lookup agrees with the per-expense one', () async {
+    final expenses = HiveStorage.expensesBoxRef;
+
+    await expenses.put(
+      'plain',
+      _cashExpense(
+        id: 'plain',
+        name: 'No split',
+        amount: 80,
+        date: DateTime(2026, 5, 2),
+      ),
+    );
+    await expenses.put(
+      'split-partly-repaid',
+      _cashExpense(
+        id: 'split-partly-repaid',
+        name: 'Dinner',
+        amount: 300,
+        date: DateTime(2026, 5, 3),
+      ),
+    );
+    await expenses.put(
+      'card-pending',
+      _expense(
+        id: 'card-pending',
+        name: 'Card',
+        amount: 45,
+        date: DateTime(2026, 5, 4),
+      ),
+    );
+
+    await SplitRepository().createSplit(
+      expenseId: 'split-partly-repaid',
+      totalAmount: 300,
+      participants: [
+        SplitParticipantModel(
+          id: '',
+          splitId: '',
+          name: 'Me',
+          amount: 100,
+          isSlipPayer: true,
+        ),
+        SplitParticipantModel(id: '', splitId: '', name: 'A', amount: 100),
+        SplitParticipantModel(id: '', splitId: '', name: 'B', amount: 100),
+      ],
+    );
+    final a = HiveStorage.splitParticipantsBoxRef.values
+        .firstWhere((p) => p.name == 'A');
+    await SplitRepository().markParticipantAsPaid(a.id);
+
+    // The indexed variants exist purely for speed; if they ever disagree with
+    // the originals, screens silently start showing different money.
+    final repository = ExpenseRepository();
+    final index = repository.buildSplitIndex();
+    for (final expense in expenses.values) {
+      expect(
+        repository.netSplitAmountWith(expense, index),
+        repository.getNetSplitAmount(expense),
+        reason: 'net mismatch for ${expense.id}',
+      );
+      expect(
+        repository.countedAmountWith(expense, index),
+        repository.getCountedAmount(expense),
+        reason: 'counted mismatch for ${expense.id}',
+      );
+    }
+    // Guard the fixture itself: a split that nets to its gross would make the
+    // comparison above vacuous.
+    expect(repository.getNetSplitAmount(expenses.get('split-partly-repaid')!), 200);
   });
 
   test('recreating a split preserves participant identity and settlement',
