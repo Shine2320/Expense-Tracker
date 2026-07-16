@@ -29,25 +29,26 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
   void initState() {
     super.initState();
     _selectedMonth = widget.month;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(expensesProvider.notifier).loadExpensesForMonth(_selectedMonth);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(balanceProvider);
     final balance =
         ref.watch(balanceProvider.notifier).getMonthBalance(_selectedMonth);
     ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
+    final expenseNotifier = ref.read(expensesProvider.notifier);
 
     final monthExpenses =
-        ref.read(expensesProvider.notifier).getExpensesByMonth(_selectedMonth);
+        expenseNotifier.getAccountingExpensesByMonth(_selectedMonth);
 
     final categoryExpenses = <String, double>{};
     for (final expense in monthExpenses) {
+      final countedAmount = expenseNotifier.getCountedAmount(expense);
+      if (countedAmount <= 0) continue;
       categoryExpenses[expense.categoryId] =
-          (categoryExpenses[expense.categoryId] ?? 0) + expense.amount;
+          (categoryExpenses[expense.categoryId] ?? 0) + countedAmount;
     }
 
     final categories = ref.watch(categoryProvider).categories;
@@ -71,9 +72,6 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                         _selectedMonth.month - 1,
                       );
                     });
-                    ref
-                        .read(expensesProvider.notifier)
-                        .loadExpensesForMonth(_selectedMonth);
                   },
                 ),
                 Expanded(
@@ -96,9 +94,6 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                         _selectedMonth.month + 1,
                       );
                     });
-                    ref
-                        .read(expensesProvider.notifier)
-                        .loadExpensesForMonth(_selectedMonth);
                   },
                 ),
               ],

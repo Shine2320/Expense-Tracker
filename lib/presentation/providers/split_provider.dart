@@ -1,14 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/split_repository.dart';
 import '../../data/models/expense_split_model.dart';
 import '../../data/models/split_participant_model.dart';
+import 'balance_provider.dart';
 
 final splitRepositoryProvider = Provider<SplitRepository>((ref) {
   return SplitRepository();
 });
 
+final splitAccountingRepositoryProvider = Provider<ExpenseRepository>((ref) {
+  return ExpenseRepository();
+});
+
 final splitProvider = StateNotifierProvider<SplitNotifier, SplitState>((ref) {
-  return SplitNotifier(ref.watch(splitRepositoryProvider));
+  return SplitNotifier(
+    ref.watch(splitRepositoryProvider),
+    ref.watch(splitAccountingRepositoryProvider),
+    () => ref.read(balanceProvider.notifier).loadBalance(),
+  );
 });
 
 class SplitState {
@@ -37,8 +47,14 @@ class SplitState {
 
 class SplitNotifier extends StateNotifier<SplitState> {
   final SplitRepository _repository;
+  final ExpenseRepository _expenseRepository;
+  final Function _onBalanceChanged;
 
-  SplitNotifier(this._repository) : super(SplitState()) {
+  SplitNotifier(
+    this._repository,
+    this._expenseRepository,
+    this._onBalanceChanged,
+  ) : super(SplitState()) {
     loadSplits();
   }
 
@@ -65,22 +81,34 @@ class SplitNotifier extends StateNotifier<SplitState> {
       participants: participants,
       splitMethod: splitMethod,
     );
+    await _refreshAccounting();
     loadSplits();
   }
 
-  Future<void> markParticipantAsPaid(String participantId) async {
-    await _repository.markParticipantAsPaid(participantId);
+  Future<void> markParticipantAsPaid(
+    String participantId, {
+    DateTime? paidAt,
+  }) async {
+    await _repository.markParticipantAsPaid(participantId, paidAt: paidAt);
+    await _refreshAccounting();
     loadSplits();
   }
 
   Future<void> unmarkParticipantAsPaid(String participantId) async {
     await _repository.unmarkParticipantAsPaid(participantId);
+    await _refreshAccounting();
     loadSplits();
   }
 
   Future<void> deleteSplitByExpenseId(String expenseId) async {
     await _repository.deleteSplitByExpenseId(expenseId);
+    await _refreshAccounting();
     loadSplits();
+  }
+
+  Future<void> _refreshAccounting() async {
+    await _expenseRepository.reconcileMonthlyExpenses();
+    _onBalanceChanged();
   }
 
   List<SplitParticipantModel> getParticipantsBySplitId(String splitId) {

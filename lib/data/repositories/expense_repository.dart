@@ -2,7 +2,9 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../datasources/hive_storage.dart';
 import '../models/expense_model.dart';
+import '../models/expense_split_model.dart';
 import '../models/monthly_balance_model.dart';
+import '../models/split_participant_model.dart';
 import '../../core/utils/date_utils.dart' as utils;
 
 class ExpenseRepository {
@@ -10,6 +12,9 @@ class ExpenseRepository {
 
   Box<ExpenseModel> get _box => HiveStorage.expensesBoxRef;
   Box<MonthlyBalanceModel> get _balanceBox => HiveStorage.monthlyBalanceBoxRef;
+  Box<ExpenseSplitModel> get _splitBox => HiveStorage.expenseSplitsBoxRef;
+  Box<SplitParticipantModel> get _participantBox =>
+      HiveStorage.splitParticipantsBoxRef;
 
   List<ExpenseModel> getAllExpenses({bool includeDeleted = false}) {
     final expenses =
@@ -45,6 +50,22 @@ class ExpenseRepository {
             (includeDeleted || !e.isDeleted))
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  List<ExpenseModel> getAccountingExpensesByMonth(DateTime date) {
+    final monthKey = utils.DateUtils.formatMonthKey(date);
+    final expenses = _box.values.where((expense) {
+      final accountingDate = getAccountingDate(expense);
+      return accountingDate != null &&
+          utils.DateUtils.formatMonthKey(accountingDate) == monthKey;
+    }).toList();
+
+    expenses.sort((a, b) {
+      final aDate = getAccountingDate(a) ?? a.date;
+      final bDate = getAccountingDate(b) ?? b.date;
+      return bDate.compareTo(aDate);
+    });
+    return expenses;
   }
 
   Map<String, List<ExpenseModel>> getExpensesGroupedByDate(
@@ -90,8 +111,9 @@ class ExpenseRepository {
       isDeleted: expense.isDeleted,
     );
     await _box.put(newExpense.id, newExpense);
-    if (!newExpense.isCreditCard) {
-      _updateMonthlyExpenses(newExpense.date, newExpense.amount);
+    final accountingDate = getAccountingDate(newExpense);
+    if (accountingDate != null) {
+      _updateMonthlyExpenses(accountingDate, newExpense.amount);
     }
     return newExpense;
   }
@@ -104,17 +126,21 @@ class ExpenseRepository {
     final existing = _box.get(expense.id);
     if (existing == null) return;
 
-    final amountToRemove = oldCountedAmount ??
-        (_isCountedInMonthlyExpenses(existing) ? existing.amount : 0.0);
-    final amountToAdd = newCountedAmount ??
-        (_isCountedInMonthlyExpenses(expense) ? expense.amount : 0.0);
+    final amountToRemove = oldCountedAmount ?? getCountedAmount(existing);
+    final amountToAdd = newCountedAmount ?? getCountedAmount(expense);
 
     if (amountToRemove != 0) {
-      _updateMonthlyExpenses(existing.date, -amountToRemove);
+      final oldAccountingDate = getAccountingDate(existing);
+      if (oldAccountingDate != null) {
+        _updateMonthlyExpenses(oldAccountingDate, -amountToRemove);
+      }
     }
     await _box.put(expense.id, expense);
     if (amountToAdd != 0) {
-      _updateMonthlyExpenses(expense.date, amountToAdd);
+      final newAccountingDate = getAccountingDate(expense);
+      if (newAccountingDate != null) {
+        _updateMonthlyExpenses(newAccountingDate, amountToAdd);
+      }
     }
   }
 
@@ -122,12 +148,12 @@ class ExpenseRepository {
     final expense = _box.get(id);
     if (expense == null) return;
 
-    final amountToRemove = countedAmount ??
-        (_isCountedInMonthlyExpenses(expense) ? expense.amount : 0.0);
+    final amountToRemove = countedAmount ?? getCountedAmount(expense);
+    final accountingDate = getAccountingDate(expense);
     expense.isDeleted = true;
     await expense.save();
-    if (amountToRemove != 0) {
-      _updateMonthlyExpenses(expense.date, -amountToRemove);
+    if (amountToRemove != 0 && accountingDate != null) {
+      _updateMonthlyExpenses(accountingDate, -amountToRemove);
     }
   }
 
@@ -136,52 +162,64 @@ class ExpenseRepository {
     final expense = _box.get(id);
     if (expense == null) return;
 
-    final amountToRemove = countedAmount ??
-        (_isCountedInMonthlyExpenses(expense) ? expense.amount : 0.0);
+    final amountToRemove = countedAmount ?? getCountedAmount(expense);
+    final accountingDate = getAccountingDate(expense);
     await _box.delete(id);
-    if (amountToRemove != 0) {
-      _updateMonthlyExpenses(expense.date, -amountToRemove);
+    if (amountToRemove != 0 && accountingDate != null) {
+      _updateMonthlyExpenses(accountingDate, -amountToRemove);
     }
   }
 
-  Future<void> markAsPaid(String id) async {
+  Future<void> markAsPaid(String id, {DateTime? paidAt}) async {
     final expense = _box.get(id);
     if (expense == null) return;
 
+    final paymentDate = paidAt ?? DateTime.now();
     expense.repaymentStatus = 'paid';
-    expense.repaymentDate = DateTime.now();
+    expense.repaymentDate = paymentDate;
     await expense.save();
-    _updateMonthlyExpenses(expense.date, expense.amount);
+    _updateMonthlyExpenses(paymentDate, expense.amount);
   }
 
-  Future<void> markAsPaidWithAmount(String id, double netAmount) async {
+  Future<void> markAsPaidWithAmount(
+    String id,
+    double netAmount, {
+    DateTime? paidAt,
+  }) async {
     final expense = _box.get(id);
     if (expense == null) return;
 
+    final paymentDate = paidAt ?? DateTime.now();
     expense.repaymentStatus = 'paid';
-    expense.repaymentDate = DateTime.now();
+    expense.repaymentDate = paymentDate;
     await expense.save();
-    _updateMonthlyExpenses(expense.date, netAmount);
+    _updateMonthlyExpenses(paymentDate, netAmount);
   }
 
   Future<void> markAsUnpaid(String id) async {
     final expense = _box.get(id);
     if (expense == null) return;
 
+    final accountingDate = getAccountingDate(expense);
     expense.repaymentStatus = 'pending';
     expense.repaymentDate = null;
     await expense.save();
-    _updateMonthlyExpenses(expense.date, -expense.amount);
+    if (accountingDate != null) {
+      _updateMonthlyExpenses(accountingDate, -expense.amount);
+    }
   }
 
   Future<void> markAsUnpaidWithAmount(String id, double netAmount) async {
     final expense = _box.get(id);
     if (expense == null) return;
 
+    final accountingDate = getAccountingDate(expense);
     expense.repaymentStatus = 'pending';
     expense.repaymentDate = null;
     await expense.save();
-    _updateMonthlyExpenses(expense.date, -netAmount);
+    if (accountingDate != null) {
+      _updateMonthlyExpenses(accountingDate, -netAmount);
+    }
   }
 
   List<ExpenseModel> getActiveExpenses() {
@@ -208,8 +246,71 @@ class ExpenseRepository {
     _updateMonthlyExpenses(date, amountChange);
   }
 
-  bool _isCountedInMonthlyExpenses(ExpenseModel expense) {
-    return !expense.isDeleted && (!expense.isCreditCard || expense.isPaid);
+  double getCountedAmount(ExpenseModel expense) {
+    if (getAccountingDate(expense) == null) return 0;
+    return getNetSplitAmount(expense);
+  }
+
+  DateTime? getAccountingDate(ExpenseModel expense) {
+    if (expense.isDeleted) return null;
+    if (!expense.isCreditCard) return expense.date;
+    if (!expense.isPaid) return null;
+    return expense.repaymentDate ?? expense.date;
+  }
+
+  Future<void> reconcileMonthlyExpenses() async {
+    final totalsByMonth = <String, double>{};
+
+    for (final expense in _box.values) {
+      final accountingDate = getAccountingDate(expense);
+      if (accountingDate == null) continue;
+
+      final monthKey = utils.DateUtils.formatMonthKey(accountingDate);
+      totalsByMonth[monthKey] =
+          (totalsByMonth[monthKey] ?? 0) + getNetSplitAmount(expense);
+    }
+
+    for (final balance in _balanceBox.values) {
+      balance.totalExpenses = totalsByMonth.remove(balance.id) ?? 0;
+      await balance.save();
+    }
+
+    for (final entry in totalsByMonth.entries) {
+      final balance =
+          _balanceBox.get(entry.key) ?? MonthlyBalanceModel(id: entry.key);
+      balance.totalExpenses = entry.value;
+      await _balanceBox.put(entry.key, balance);
+    }
+  }
+
+  double getNetSplitAmount(ExpenseModel expense) {
+    ExpenseSplitModel? split;
+    try {
+      split = _splitBox.values.firstWhere((s) => s.expenseId == expense.id);
+    } catch (_) {
+      split = null;
+    }
+
+    if (split == null || split.slipPersonId == null) {
+      return expense.amount;
+    }
+
+    final splitModel = split;
+    final collectedFromOthers = _participantBox.values.fold<double>(0, (
+      sum,
+      participant,
+    ) {
+      if (participant.splitId == splitModel.id &&
+          !participant.isSlipPayer &&
+          participant.isPaid) {
+        return sum + participant.amount;
+      }
+      return sum;
+    });
+
+    return (expense.amount - collectedFromOthers)
+        .clamp(0, double.infinity)
+        .toDouble();
   }
 
   double getTotalForMonth(DateTime date) {

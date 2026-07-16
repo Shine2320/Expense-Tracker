@@ -8,7 +8,8 @@ class SplitRepository {
   static const _uuid = Uuid();
 
   Box<ExpenseSplitModel> get _splitBox => HiveStorage.expenseSplitsBoxRef;
-  Box<SplitParticipantModel> get _participantBox => HiveStorage.splitParticipantsBoxRef;
+  Box<SplitParticipantModel> get _participantBox =>
+      HiveStorage.splitParticipantsBoxRef;
 
   List<ExpenseSplitModel> getAllSplits() {
     return _splitBox.values.toList()
@@ -41,7 +42,9 @@ class SplitRepository {
   }
 
   List<SplitParticipantModel> getPendingPayments() {
-    return _participantBox.values.where((p) => !p.isPaid && !p.isSlipPayer).toList();
+    return _participantBox.values
+        .where((p) => !p.isPaid && !p.isSlipPayer)
+        .toList();
   }
 
   Future<ExpenseSplitModel> createSplit({
@@ -85,12 +88,15 @@ class SplitRepository {
     return split;
   }
 
-  Future<void> markParticipantAsPaid(String participantId) async {
+  Future<void> markParticipantAsPaid(
+    String participantId, {
+    DateTime? paidAt,
+  }) async {
     final participant = _participantBox.get(participantId);
     if (participant == null) return;
 
     participant.isPaid = true;
-    participant.paidAt = DateTime.now();
+    participant.paidAt = paidAt ?? DateTime.now();
     await participant.save();
   }
 
@@ -143,7 +149,8 @@ class SplitRepository {
 
   List<SplitParticipantModel> getAllPendingForSlipPerson(String slipPersonId) {
     final result = <SplitParticipantModel>[];
-    final allSplits = _splitBox.values.where((s) => s.slipPersonId == slipPersonId);
+    final allSplits =
+        _splitBox.values.where((s) => s.slipPersonId == slipPersonId);
     for (final split in allSplits) {
       final participants = _participantBox.values
           .where((p) => p.splitId == split.id && !p.isSlipPayer && !p.isPaid);

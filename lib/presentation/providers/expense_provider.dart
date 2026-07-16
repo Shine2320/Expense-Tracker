@@ -127,7 +127,7 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     _onBalanceChanged();
   }
 
-  Future<void> markAsPaid(String id) async {
+  Future<void> markAsPaid(String id, {DateTime? paidAt}) async {
     final expense = _repository.getExpenseById(id);
     if (expense == null ||
         expense.isDeleted ||
@@ -135,7 +135,36 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
         expense.isPaid) {
       return;
     }
-    await _repository.markAsPaidWithAmount(id, _netSplitAmount(expense));
+    await _repository.markAsPaidWithAmount(
+      id,
+      _repository.getNetSplitAmount(expense),
+      paidAt: paidAt,
+    );
+    loadExpenses();
+    _onBalanceChanged();
+  }
+
+  Future<void> markCardAsPaid(String cardName, {DateTime? paidAt}) async {
+    final normalizedCardName = _normalizeCardName(cardName);
+    final expenses = _repository.getAllExpenses().where((expense) {
+      return expense.isCreditCard &&
+          expense.isPending &&
+          !expense.isDeleted &&
+          _normalizeCardName(expense.creditCardName) == normalizedCardName;
+    }).toList();
+
+    if (expenses.isEmpty) {
+      return;
+    }
+
+    final paymentDate = paidAt ?? DateTime.now();
+    for (final expense in expenses) {
+      await _repository.markAsPaidWithAmount(
+        expense.id,
+        _repository.getNetSplitAmount(expense),
+        paidAt: paymentDate,
+      );
+    }
     loadExpenses();
     _onBalanceChanged();
   }
@@ -157,29 +186,15 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
   }
 
   double _countedMonthlyAmount(ExpenseModel expense) {
-    if (expense.isDeleted || (expense.isCreditCard && !expense.isPaid)) {
-      return 0;
-    }
-    return _netSplitAmount(expense);
+    return _repository.getCountedAmount(expense);
   }
 
-  double _netSplitAmount(ExpenseModel expense) {
-    final split = _splitRepository.getSplitByExpenseId(expense.id);
-    if (split == null || split.slipPersonId == null) {
-      return expense.amount;
+  String _normalizeCardName(String? cardName) {
+    final trimmed = cardName?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'unknown card';
     }
-
-    final participants = _splitRepository.getParticipantsBySplitId(split.id);
-    final collectedFromOthers = participants.fold<double>(0, (sum, p) {
-      if (!p.isSlipPayer && p.isPaid) {
-        return sum + p.amount;
-      }
-      return sum;
-    });
-
-    return (expense.amount - collectedFromOthers)
-        .clamp(0, double.infinity)
-        .toDouble();
+    return trimmed.toLowerCase();
   }
 
   double getTotalForDate(DateTime date) {
@@ -236,5 +251,21 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
 
   double getTotalForMonth(DateTime date) {
     return _repository.getTotalForMonth(date);
+  }
+
+  List<ExpenseModel> getAccountingExpensesByMonth(DateTime month) {
+    return _repository.getAccountingExpensesByMonth(month);
+  }
+
+  DateTime? getAccountingDate(ExpenseModel expense) {
+    return _repository.getAccountingDate(expense);
+  }
+
+  double getCountedAmount(ExpenseModel expense) {
+    return _repository.getCountedAmount(expense);
+  }
+
+  double getNetSplitAmount(ExpenseModel expense) {
+    return _repository.getNetSplitAmount(expense);
   }
 }

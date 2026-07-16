@@ -11,6 +11,7 @@ import '../models/monthly_balance_model.dart';
 import '../models/expense_split_model.dart';
 import '../models/split_participant_model.dart';
 import '../datasources/hive_storage.dart';
+import '../repositories/expense_repository.dart';
 
 class ExportImportData {
   static const MethodChannel _downloadsChannel = MethodChannel(
@@ -240,6 +241,7 @@ class ExportImportData {
     final jsonStr = await file.readAsString();
     final data = jsonDecode(jsonStr) as Map<String, dynamic>;
     await _deserializeAll(data);
+    await ExpenseRepository().reconcileMonthlyExpenses();
   }
 
   // ── Export to Excel file ──
@@ -483,6 +485,8 @@ class ExportImportData {
       }
       await _deleteMissingKeys(_participantBox, importedIds);
     }
+
+    await ExpenseRepository().reconcileMonthlyExpenses();
   }
 
   // ── Pick a file for import ──

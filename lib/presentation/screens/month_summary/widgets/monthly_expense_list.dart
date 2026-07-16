@@ -6,6 +6,7 @@ import '../../../../../core/utils/date_utils.dart' as utils;
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../presentation/providers/currency_provider.dart';
+import '../../../../presentation/providers/expense_provider.dart';
 import '../../expenses/widgets/expense_item.dart';
 
 class MonthlyExpenseList extends ConsumerWidget {
@@ -22,9 +23,12 @@ class MonthlyExpenseList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = ref.watch(currencyProvider);
     final groupedByDate = <String, List<ExpenseModel>>{};
+    final expenseNotifier = ref.watch(expensesProvider.notifier);
 
     for (final expense in expenses) {
-      final dateKey = utils.DateUtils.formatDate(expense.date);
+      final accountingDate =
+          expenseNotifier.getAccountingDate(expense) ?? expense.date;
+      final dateKey = utils.DateUtils.formatDate(accountingDate);
       if (!groupedByDate.containsKey(dateKey)) {
         groupedByDate[dateKey] = [];
       }
@@ -62,7 +66,10 @@ class MonthlyExpenseList extends ConsumerWidget {
           final dateKey = entry.key;
           final dateExpenses = entry.value;
           final date = DateTime.parse(dateKey);
-          final dayTotal = dateExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+          final dayTotal = dateExpenses.fold<double>(
+            0,
+            (sum, e) => sum + expenseNotifier.getCountedAmount(e),
+          );
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,10 +103,25 @@ class MonthlyExpenseList extends ConsumerWidget {
                   (c) => c.id == expense.categoryId,
                   orElse: () => categories.firstWhere((c) => c.id == 'other'),
                 );
+                final accountingDate =
+                    expenseNotifier.getAccountingDate(expense) ?? expense.date;
+                final showCreditPaymentDetails =
+                    expense.isCreditCard && expense.isPaid;
+                final isPreviousMonthCredit = showCreditPaymentDetails &&
+                    utils.DateUtils.formatMonthKey(accountingDate) !=
+                        utils.DateUtils.formatMonthKey(expense.date);
+
                 return ExpenseItem(
                   expense: expense,
                   category: category,
                   currency: currency,
+                  amountOverride: expenseNotifier.getCountedAmount(expense),
+                  statusLabel: showCreditPaymentDetails
+                      ? 'Credit paid this month'
+                      : null,
+                  detailText: isPreviousMonthCredit
+                      ? 'Original expense: ${utils.DateUtils.formatDisplayDate(expense.date)}'
+                      : null,
                   onEdit: () {},
                   onDelete: () {},
                 );

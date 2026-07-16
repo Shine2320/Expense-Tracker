@@ -5,7 +5,6 @@ import '../../../data/models/expense_model.dart';
 import '../../../data/models/split_participant_model.dart';
 import '../../providers/split_provider.dart';
 import '../../providers/expense_provider.dart';
-import '../../providers/balance_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/constants/app_spacing.dart';
@@ -77,10 +76,6 @@ class SplitSummaryScreen extends ConsumerWidget {
                     nonSlipParticipants.where((p) => !p.isPaid).toList();
                 final paidParticipants =
                     nonSlipParticipants.where((p) => p.isPaid).toList();
-                final shouldAdjustExpenseTotal = expense.id.isNotEmpty &&
-                    !expense.isDeleted &&
-                    (!expense.isCreditCard || expense.isPaid);
-
                 return Card(
                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: Padding(
@@ -165,15 +160,6 @@ class SplitSummaryScreen extends ConsumerWidget {
                                           .read(splitProvider.notifier)
                                           .markParticipantAsPaid(
                                               participant.id);
-                                      if (shouldAdjustExpenseTotal) {
-                                        ref
-                                            .read(expenseRepositoryProvider)
-                                            .adjustMonthlyExpenses(expense.date,
-                                                -participant.amount);
-                                      }
-                                      ref
-                                          .read(balanceProvider.notifier)
-                                          .loadBalance();
                                     },
                                     tooltip: 'Mark as Paid',
                                   ),
@@ -233,15 +219,6 @@ class SplitSummaryScreen extends ConsumerWidget {
                                           .read(splitProvider.notifier)
                                           .unmarkParticipantAsPaid(
                                               participant.id);
-                                      if (shouldAdjustExpenseTotal) {
-                                        ref
-                                            .read(expenseRepositoryProvider)
-                                            .adjustMonthlyExpenses(expense.date,
-                                                participant.amount);
-                                      }
-                                      ref
-                                          .read(balanceProvider.notifier)
-                                          .loadBalance();
                                     },
                                     tooltip: 'Undo Paid',
                                   ),
