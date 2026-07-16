@@ -22,11 +22,26 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Signing material lives in android/key.properties, which is gitignored along
+// with the keystore itself and is never committed. Absent it, release falls back
+// to the debug key so a plain checkout still builds. The fallback warns below,
+// but `flutter build` filters Gradle's log — you only see it under --verbose, so
+// treat the fallback as silent in practice and check the signer before shipping:
+//   apksigner verify --print-certs <apk>   # CN=Android Debug means unpublishable
+// See PUBLISH_CHECKLIST.md Step 3-4.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+def hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace "com.example.expense_tracker"
     // compileSdk only governs which APIs compile, not runtime behaviour: file_picker
     // and flutter_plugin_android_lifecycle compile against 36, androidx.core needs 35+.
-    // targetSdk stays at 34 — raising that opts into new runtime behaviour.
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
@@ -49,9 +64,23 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion 33
-        targetSdkVersion 34
+        // Play requires 35+ for releases. 36 enables the Android 15 edge-to-edge
+        // enforcement, which lets system bars overlay the app: the scaffolds rely
+        // on SafeArea/viewInsets to stay clear of them, verified on an emulator.
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+    }
+
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
     }
 
     buildTypes {
@@ -59,7 +88,17 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    if (!hasKeystore) {
+        gradle.taskGraph.whenReady { graph ->
+            if (graph.allTasks.any { it.name.toLowerCase().contains('release') }) {
+                logger.warn('WARNING: android/key.properties not found — this ' +
+                        'release is signed with the DEBUG key and cannot be ' +
+                        'published. See PUBLISH_CHECKLIST.md Step 3-4.')
+            }
         }
     }
 

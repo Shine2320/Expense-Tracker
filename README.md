@@ -56,7 +56,10 @@ lib/
 
 Two hard blockers, both covered in [`PUBLISH_CHECKLIST.md`](PUBLISH_CHECKLIST.md):
 
-- Release builds are still signed with the **debug key**.
+- No keystore, so release builds fall back to the **debug key**. The Gradle side
+  is already wired: drop in `android/key.properties` (Step 3-4) and it signs for
+  real. The fallback is quiet — `apksigner verify --print-certs` on the APK is
+  the way to know what signed it.
 - The package is still `com.example.expense_tracker`, which Play will not accept.
 
 ## Known limitations

@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:excel/excel.dart';
@@ -13,10 +15,26 @@ import '../models/split_participant_model.dart';
 import '../datasources/hive_storage.dart';
 import '../repositories/expense_repository.dart';
 
+/// Thrown when a chosen workbook would expand to more than the import cap.
+class ImportTooLargeException implements Exception {
+  final String message;
+  const ImportTooLargeException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class ExportImportData {
   static const MethodChannel _downloadsChannel = MethodChannel(
     'expense_tracker/downloads',
   );
+
+  /// Cap on a workbook's total uncompressed size. An .xlsx is mostly XML and
+  /// compresses hard, so a real export of this app's data is orders of
+  /// magnitude under this; the cap only has to be below what exhausts memory.
+  /// Overridable so tests can trip the guard without allocating a real bomb.
+  @visibleForTesting
+  static int maxUncompressedBytes = 256 * 1024 * 1024;
 
   static Box<ExpenseModel> get _expenseBox => HiveStorage.expensesBoxRef;
   static Box<CategoryModel> get _categoryBox => HiveStorage.categoriesBoxRef;
@@ -237,6 +255,35 @@ class ExportImportData {
     );
   }
 
+  /// Rejects a workbook whose entries claim to expand past
+  /// [maxUncompressedBytes], before anything inflates them.
+  ///
+  /// `Excel.decodeBytes` inflates every entry with no ceiling, on the calling
+  /// isolate — so a small file whose sheet XML expands to gigabytes freezes the
+  /// UI and gets the app OOM-killed, which no try/catch can recover from (a Dart
+  /// OOM kills the process rather than throwing). Reading the zip directory is
+  /// cheap and does not inflate: `ZipFile.content` is lazy, and the entry sizes
+  /// here are the ones declared in the central directory.
+  static void _guardWorkbookSize(List<int> bytes) {
+    final Archive archive;
+    try {
+      archive = ZipDecoder().decodeBytes(bytes);
+    } catch (e) {
+      throw const ImportTooLargeException(
+        'That file is not a readable .xlsx workbook.',
+      );
+    }
+    var total = 0;
+    for (final entry in archive.files) {
+      total += entry.size;
+      if (total > maxUncompressedBytes) {
+        throw const ImportTooLargeException(
+          'That workbook is too large to import safely.',
+        );
+      }
+    }
+  }
+
   // ── Import from JSON file ──
   static Future<void> importFromJson(String filePath) async {
     final file = File(filePath);
@@ -363,6 +410,7 @@ class ExportImportData {
   static Future<void> importFromExcel(String filePath) async {
     final file = File(filePath);
     final bytes = await file.readAsBytes();
+    _guardWorkbookSize(bytes);
     final excel = Excel.decodeBytes(bytes);
 
     // Expenses sheet
