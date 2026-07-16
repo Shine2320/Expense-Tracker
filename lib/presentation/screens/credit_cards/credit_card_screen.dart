@@ -39,9 +39,12 @@ class _CreditCardScreenState extends ConsumerState<CreditCardScreen> {
     final selectedExpenses = _selectedStatus == 'paid' ? paid : pending;
 
     // Net of split repayments — what you actually owe / paid on the card.
+    // Indexed once rather than rescanning the split boxes per expense.
     final expenseNotifier = ref.read(expensesProvider.notifier);
+    final splitIndex = expenseNotifier.buildSplitIndex();
     final netByExpenseId = <String, double>{
-      for (final e in creditExpenses) e.id: expenseNotifier.getNetSplitAmount(e),
+      for (final e in creditExpenses)
+        e.id: expenseNotifier.netSplitAmountWith(e, splitIndex),
     };
     final grouped = _groupByCard(selectedExpenses, netByExpenseId);
     final pendingTotal =

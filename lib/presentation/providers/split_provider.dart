@@ -115,6 +115,12 @@ class SplitNotifier extends StateNotifier<SplitState> {
     return _repository.getParticipantsBySplitId(splitId);
   }
 
+  /// All participants grouped by split, in one pass. Prefer this over calling
+  /// [getParticipantsBySplitId] once per row.
+  Map<String, List<SplitParticipantModel>> participantsBySplitId() {
+    return _repository.participantsBySplitId();
+  }
+
   ExpenseSplitModel? getSplitByExpenseId(String expenseId) {
     return _repository.getSplitByExpenseId(expenseId);
   }

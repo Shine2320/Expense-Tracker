@@ -47,9 +47,12 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
     final previousMonth =
         DateTime(_selectedMonth.year, _selectedMonth.month - 1);
 
+    // Indexed once: the per-expense variant rescans the split boxes each call.
+    final splitIndex = expenseNotifier.buildSplitIndex();
     final categoryExpenses = <String, double>{};
     for (final expense in monthExpenses) {
-      final countedAmount = expenseNotifier.getCountedAmount(expense);
+      final countedAmount =
+          expenseNotifier.countedAmountWith(expense, splitIndex);
       if (countedAmount <= 0) continue;
       categoryExpenses[expense.categoryId] =
           (categoryExpenses[expense.categoryId] ?? 0) + countedAmount;
