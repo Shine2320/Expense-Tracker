@@ -67,6 +67,21 @@ class BalanceNotifier extends StateNotifier<BalanceState> {
     loadBalance();
   }
 
+  /// Drops the manual override so this month follows the calculated chain again.
+  Future<void> clearCarryOverAdjustment() async {
+    await _repository.clearCarryOverAdjustment(
+      utils.DateUtils.formatMonthKey(DateTime.now()),
+    );
+    loadBalance();
+  }
+
+  /// What the carry-over would be with no manual adjustment.
+  double calculatedCarryOver() {
+    return _repository.calculatedCarryOverFor(
+      utils.DateUtils.formatMonthKey(DateTime.now()),
+    );
+  }
+
   Future<void> setMonthSalary(String monthKey, double salary) async {
     await _repository.setMonthSalary(monthKey, salary);
     loadBalance();

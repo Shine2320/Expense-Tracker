@@ -72,6 +72,7 @@ class SplitRepository {
         amount: participant.amount,
         isSlipPayer: participant.isSlipPayer,
         isPaid: participant.isPaid,
+        paidAt: participant.paidAt,
       );
       await _participantBox.put(p.id, p);
       if (participant.isSlipPayer) {

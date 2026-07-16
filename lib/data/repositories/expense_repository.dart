@@ -6,6 +6,7 @@ import '../models/expense_split_model.dart';
 import '../models/monthly_balance_model.dart';
 import '../models/split_participant_model.dart';
 import '../../core/utils/date_utils.dart' as utils;
+import 'balance_repository.dart';
 
 class ExpenseRepository {
   static const _uuid = Uuid();
@@ -113,7 +114,7 @@ class ExpenseRepository {
     await _box.put(newExpense.id, newExpense);
     final accountingDate = getAccountingDate(newExpense);
     if (accountingDate != null) {
-      _updateMonthlyExpenses(accountingDate, newExpense.amount);
+      _updateMonthlyExpenses(accountingDate, getCountedAmount(newExpense));
     }
     return newExpense;
   }
@@ -170,17 +171,6 @@ class ExpenseRepository {
     }
   }
 
-  Future<void> markAsPaid(String id, {DateTime? paidAt}) async {
-    final expense = _box.get(id);
-    if (expense == null) return;
-
-    final paymentDate = paidAt ?? DateTime.now();
-    expense.repaymentStatus = 'paid';
-    expense.repaymentDate = paymentDate;
-    await expense.save();
-    _updateMonthlyExpenses(paymentDate, expense.amount);
-  }
-
   Future<void> markAsPaidWithAmount(
     String id,
     double netAmount, {
@@ -194,19 +184,6 @@ class ExpenseRepository {
     expense.repaymentDate = paymentDate;
     await expense.save();
     _updateMonthlyExpenses(paymentDate, netAmount);
-  }
-
-  Future<void> markAsUnpaid(String id) async {
-    final expense = _box.get(id);
-    if (expense == null) return;
-
-    final accountingDate = getAccountingDate(expense);
-    expense.repaymentStatus = 'pending';
-    expense.repaymentDate = null;
-    await expense.save();
-    if (accountingDate != null) {
-      _updateMonthlyExpenses(accountingDate, -expense.amount);
-    }
   }
 
   Future<void> markAsUnpaidWithAmount(String id, double netAmount) async {
@@ -237,13 +214,14 @@ class ExpenseRepository {
     final balance =
         _balanceBox.get(monthKey) ?? MonthlyBalanceModel(id: monthKey);
 
-    balance.totalExpenses =
-        (balance.totalExpenses + amountChange).clamp(0, double.infinity);
+    // Deliberately unclamped: clamping a negative delta to zero hides a
+    // mismatched adjustment until the next startup reconcile silently "heals"
+    // it, which is precisely the drift this accounting is meant to surface.
+    balance.totalExpenses += amountChange;
     _balanceBox.put(monthKey, balance);
-  }
-
-  void adjustMonthlyExpenses(DateTime date, double amountChange) {
-    _updateMonthlyExpenses(date, amountChange);
+    // The incremental path must chain too — rebuilding only in reconcile would
+    // leave later months stale until the next restart.
+    BalanceRepository().rebuildCarryOverChain();
   }
 
   double getCountedAmount(ExpenseModel expense) {
@@ -259,15 +237,33 @@ class ExpenseRepository {
   }
 
   Future<void> reconcileMonthlyExpenses() async {
-    final totalsByMonth = <String, double>{};
+    await _healMissingRepaymentDates();
 
+    // Index once instead of rescanning both boxes per expense.
+    final splitsByExpenseId = <String, ExpenseSplitModel>{
+      for (final split in _splitBox.values) split.expenseId: split,
+    };
+    final collectedBySplitId = <String, double>{};
+    for (final participant in _participantBox.values) {
+      if (participant.isSlipPayer || !participant.isPaid) continue;
+      collectedBySplitId[participant.splitId] =
+          (collectedBySplitId[participant.splitId] ?? 0) + participant.amount;
+    }
+
+    final totalsByMonth = <String, double>{};
     for (final expense in _box.values) {
       final accountingDate = getAccountingDate(expense);
       if (accountingDate == null) continue;
 
+      final split = splitsByExpenseId[expense.id];
+      final netAmount = _netAmountFrom(
+        expense,
+        split,
+        split == null ? 0 : collectedBySplitId[split.id] ?? 0,
+      );
+
       final monthKey = utils.DateUtils.formatMonthKey(accountingDate);
-      totalsByMonth[monthKey] =
-          (totalsByMonth[monthKey] ?? 0) + getNetSplitAmount(expense);
+      totalsByMonth[monthKey] = (totalsByMonth[monthKey] ?? 0) + netAmount;
     }
 
     for (final balance in _balanceBox.values) {
@@ -280,6 +276,24 @@ class ExpenseRepository {
           _balanceBox.get(entry.key) ?? MonthlyBalanceModel(id: entry.key);
       balance.totalExpenses = entry.value;
       await _balanceBox.put(entry.key, balance);
+    }
+
+    // Strictly after totals: each month's remainder feeds the next month's
+    // carry-over.
+    BalanceRepository().rebuildCarryOverChain();
+  }
+
+  /// A paid credit expense with no repayment date silently falls back to its
+  /// original month. Persist the fallback so the guess is explicit and visible
+  /// rather than re-derived on every read. Reachable via imported backups.
+  Future<void> _healMissingRepaymentDates() async {
+    for (final expense in _box.values) {
+      if (expense.isCreditCard &&
+          expense.isPaid &&
+          expense.repaymentDate == null) {
+        expense.repaymentDate = expense.date;
+        await expense.save();
+      }
     }
   }
 
@@ -308,6 +322,19 @@ class ExpenseRepository {
       return sum;
     });
 
+    return _netAmountFrom(expense, split, collectedFromOthers);
+  }
+
+  /// Shared by [getNetSplitAmount] and the indexed reconcile loop so the two
+  /// cannot disagree about what an expense actually costs you.
+  double _netAmountFrom(
+    ExpenseModel expense,
+    ExpenseSplitModel? split,
+    double collectedFromOthers,
+  ) {
+    if (split == null || split.slipPersonId == null) {
+      return expense.amount;
+    }
     return (expense.amount - collectedFromOthers)
         .clamp(0, double.infinity)
         .toDouble();
@@ -319,20 +346,19 @@ class ExpenseRepository {
     return balance?.totalExpenses ?? 0.0;
   }
 
-  Map<DateTime, List<ExpenseModel>> getDaysWithExpenses(
-    DateTime month, {
-    bool includeDeleted = false,
-  }) {
-    final expenses = getExpensesByMonth(month, includeDeleted: includeDeleted);
+  /// Days bucketed by *accounting* date, so the calendar agrees with the
+  /// balance card: a card expense paid this month lands on the day you paid it,
+  /// and an unpaid one doesn't show as spending at all.
+  Map<DateTime, List<ExpenseModel>> getAccountingDaysWithExpenses(
+    DateTime month,
+  ) {
     final days = <DateTime, List<ExpenseModel>>{};
 
-    for (final expense in expenses) {
-      final day =
-          DateTime(expense.date.year, expense.date.month, expense.date.day);
-      if (!days.containsKey(day)) {
-        days[day] = [];
-      }
-      days[day]!.add(expense);
+    for (final expense in getAccountingExpensesByMonth(month)) {
+      // Non-null by construction: getAccountingExpensesByMonth filters on it.
+      final date = getAccountingDate(expense)!;
+      final day = DateTime(date.year, date.month, date.day);
+      (days[day] ??= []).add(expense);
     }
 
     return days;

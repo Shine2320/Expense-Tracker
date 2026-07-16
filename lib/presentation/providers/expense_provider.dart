@@ -239,14 +239,10 @@ class ExpenseNotifier extends StateNotifier<ExpenseState> {
     );
   }
 
-  Map<DateTime, List<ExpenseModel>> getDaysWithExpenses(
-    DateTime month, {
-    bool includeDeleted = false,
-  }) {
-    return _repository.getDaysWithExpenses(
-      month,
-      includeDeleted: includeDeleted,
-    );
+  Map<DateTime, List<ExpenseModel>> getAccountingDaysWithExpenses(
+    DateTime month,
+  ) {
+    return _repository.getAccountingDaysWithExpenses(month);
   }
 
   double getTotalForMonth(DateTime date) {
