@@ -14,7 +14,10 @@ class BalanceRepository {
       balance = MonthlyBalanceModel(id: monthKey);
       _box.put(monthKey, balance);
 
-      _carryOverFromPreviousMonth(balance);
+      // Reconciliation only creates rows for months that have expenses, so a
+      // brand-new month gets its row here and needs the chain run to pick up
+      // the previous month's remainder.
+      rebuildCarryOverChain();
     }
 
     return balance;
@@ -37,41 +40,67 @@ class BalanceRepository {
   }
 
   Future<void> updateCarryOver(double carryOver) async {
-    final balance = getCurrentMonthBalance();
-    balance.carryOver = carryOver;
-    await balance.save();
+    await setCarryOverForMonth(
+      utils.DateUtils.formatMonthKey(DateTime.now()),
+      carryOver,
+    );
   }
 
   Future<void> setMonthSalary(String monthKey, double salary) async {
     final balance = _box.get(monthKey) ?? MonthlyBalanceModel(id: monthKey);
     balance.salary = salary;
     await _box.put(monthKey, balance);
+    rebuildCarryOverChain();
   }
 
-  void _carryOverFromPreviousMonth(MonthlyBalanceModel currentBalance) {
-    final parts = currentBalance.id.split('-');
-    final year = int.parse(parts[0]);
-    final month = int.parse(parts[1]);
+  /// Recomputes every month's [MonthlyBalanceModel.carryOver] from the month
+  /// before it, so a correction to an old month (a settled split, a credit card
+  /// paid later) propagates forward instead of leaving later months frozen at
+  /// the value they happened to be created with.
+  ///
+  /// Must run *after* `totalExpenses` is up to date, since each month's
+  /// remainder feeds the next.
+  void rebuildCarryOverChain() {
+    // "YYYY-MM" is zero-padded, so lexicographic order is chronological order.
+    final balances = _box.values.toList()..sort((a, b) => a.id.compareTo(b.id));
 
-    DateTime previousMonth;
-    if (month == 1) {
-      previousMonth = DateTime(year - 1, 12);
-    } else {
-      previousMonth = DateTime(year, month - 1);
-    }
-
-    final previousKey = utils.DateUtils.formatMonthKey(previousMonth);
-    final previousBalance = _box.get(previousKey);
-
-    if (previousBalance != null && previousBalance.remainingBalance > 0) {
-      currentBalance.carryOver = previousBalance.remainingBalance;
-      _box.put(currentBalance.id, currentBalance);
+    var previousRemaining = 0.0;
+    for (final balance in balances) {
+      // The earliest month has no predecessor, so its carry-over is purely its
+      // adjustment — i.e. whatever opening balance the user entered.
+      balance.carryOver = previousRemaining + balance.carryOverAdjustment;
+      _box.put(balance.id, balance);
+      // Read after assigning: remainingBalance depends on carryOver.
+      previousRemaining = balance.remainingBalance;
     }
   }
 
-  Future<void> recalculateMonthlyExpenses(String monthKey, double totalExpenses) async {
+  /// Records a user-entered carry-over as an *adjustment* from the calculated
+  /// value, so later corrections to earlier months still reach this month.
+  Future<void> setCarryOverForMonth(String monthKey, double carryOver) async {
     final balance = _box.get(monthKey) ?? MonthlyBalanceModel(id: monthKey);
-    balance.totalExpenses = totalExpenses;
     await _box.put(monthKey, balance);
+    rebuildCarryOverChain();
+
+    final calculated = balance.carryOver - balance.carryOverAdjustment;
+    balance.carryOverAdjustment = carryOver - calculated;
+    await _box.put(monthKey, balance);
+    rebuildCarryOverChain();
+  }
+
+  /// Drops a manual override, returning the month to its calculated carry-over.
+  Future<void> clearCarryOverAdjustment(String monthKey) async {
+    final balance = _box.get(monthKey);
+    if (balance == null) return;
+    balance.carryOverAdjustment = 0;
+    await _box.put(monthKey, balance);
+    rebuildCarryOverChain();
+  }
+
+  /// The carry-over this month would have without any manual adjustment.
+  double calculatedCarryOverFor(String monthKey) {
+    final balance = _box.get(monthKey);
+    if (balance == null) return 0;
+    return balance.carryOver - balance.carryOverAdjustment;
   }
 }

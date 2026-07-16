@@ -6,6 +6,7 @@ import 'package:expense_tracker/data/models/expense_model.dart';
 import 'package:expense_tracker/data/models/expense_split_model.dart';
 import 'package:expense_tracker/data/models/monthly_balance_model.dart';
 import 'package:expense_tracker/data/models/split_participant_model.dart';
+import 'package:expense_tracker/data/repositories/balance_repository.dart';
 import 'package:expense_tracker/data/repositories/expense_repository.dart';
 import 'package:expense_tracker/data/repositories/split_repository.dart';
 import 'package:expense_tracker/presentation/providers/expense_provider.dart';
@@ -214,7 +215,9 @@ void main() {
       MonthlyBalanceModel(
         id: '2026-05',
         salary: 1000,
-        carryOver: 50,
+        // Earliest month: its carry-over is an opening balance, expressed as an
+        // adjustment. Migration seeds this from legacy stored carryOver values.
+        carryOverAdjustment: 50,
         totalExpenses: 999,
       ),
     );
@@ -275,7 +278,8 @@ void main() {
     expect(balances.get('2026-05')!.carryOver, 50);
     expect(balances.get('2026-05')!.totalExpenses, 65);
     expect(balances.get('2026-06')!.salary, 2000);
-    expect(balances.get('2026-06')!.carryOver, 75);
+    // Chained from May: 1000 + 50 - 65 = 985.
+    expect(balances.get('2026-06')!.carryOver, 985);
     expect(balances.get('2026-06')!.totalExpenses, 100);
   });
 
@@ -398,7 +402,9 @@ void main() {
       MonthlyBalanceModel(
         id: '2026-05',
         salary: 1000,
-        carryOver: 50,
+        // Earliest month: its carry-over is an opening balance, expressed as an
+        // adjustment. Migration seeds this from legacy stored carryOver values.
+        carryOverAdjustment: 50,
         totalExpenses: 999,
       ),
     );
@@ -445,7 +451,8 @@ void main() {
     expect(balances.get('2026-05')!.carryOver, 50);
     expect(balances.get('2026-05')!.totalExpenses, 30);
     expect(balances.get('2026-06')!.salary, 2000);
-    expect(balances.get('2026-06')!.carryOver, 75);
+    // Chained from May: 1000 + 50 - 30 = 1020.
+    expect(balances.get('2026-06')!.carryOver, 1020);
     expect(balances.get('2026-06')!.totalExpenses, 40);
   });
 
@@ -589,7 +596,9 @@ void main() {
       MonthlyBalanceModel(
         id: '2026-05',
         salary: 1000,
-        carryOver: 50,
+        // Earliest month: its carry-over is an opening balance, expressed as an
+        // adjustment. Migration seeds this from legacy stored carryOver values.
+        carryOverAdjustment: 50,
         totalExpenses: 999,
       ),
     );
@@ -658,8 +667,345 @@ void main() {
     expect(balances.get('2026-05')!.carryOver, 50);
     expect(balances.get('2026-05')!.totalExpenses, 60);
     expect(balances.get('2026-06')!.salary, 2000);
-    expect(balances.get('2026-06')!.carryOver, 75);
+    // Chained from May: 1000 + 50 - 60 = 990. Before the carry-over chain this
+    // stayed frozen at whatever was stored when June was first opened, so
+    // settling the May split never reached June.
+    expect(balances.get('2026-06')!.carryOver, 990);
     expect(balances.get('2026-06')!.totalExpenses, 25);
+  });
+
+  test('settling a previous month split raises this month remaining', () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put(
+      '2026-05',
+      MonthlyBalanceModel(id: '2026-05', salary: 1000),
+    );
+    await balances.put(
+      '2026-06',
+      MonthlyBalanceModel(id: '2026-06', salary: 1000),
+    );
+    await expenses.put(
+      'may-dinner',
+      _cashExpense(
+        id: 'may-dinner',
+        name: 'May dinner',
+        amount: 120,
+        date: DateTime(2026, 5, 30),
+      ),
+    );
+
+    final splitRepository = SplitRepository();
+    await splitRepository.createSplit(
+      expenseId: 'may-dinner',
+      totalAmount: 120,
+      participants: [
+        SplitParticipantModel(
+          id: '',
+          splitId: '',
+          name: 'Me',
+          amount: 60,
+          isSlipPayer: true,
+        ),
+        SplitParticipantModel(id: '', splitId: '', name: 'Friend', amount: 60),
+      ],
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    // Before settlement: the full 120 sits in May, June carries May's remainder.
+    expect(balances.get('2026-05')!.totalExpenses, 120);
+    expect(balances.get('2026-05')!.remainingBalance, 880);
+    expect(balances.get('2026-06')!.carryOver, 880);
+    expect(balances.get('2026-06')!.remainingBalance, 1880);
+
+    final friend = HiveStorage.splitParticipantsBoxRef.values
+        .firstWhere((p) => p.name == 'Friend');
+    await splitRepository.markParticipantAsPaid(
+      friend.id,
+      paidAt: DateTime(2026, 6, 2),
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    // Retroactive: May's counted expense drops to the user's own 60...
+    expect(balances.get('2026-05')!.totalExpenses, 60);
+    expect(balances.get('2026-05')!.remainingBalance, 940);
+    // ...and the correction propagates forward. This is the reported bug.
+    expect(balances.get('2026-06')!.carryOver, 940);
+    expect(balances.get('2026-06')!.remainingBalance, 1940);
+  });
+
+  test('manual carry-over adjustment survives a later split settlement',
+      () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put(
+      '2026-05',
+      MonthlyBalanceModel(id: '2026-05', salary: 1000),
+    );
+    await balances.put(
+      '2026-06',
+      MonthlyBalanceModel(id: '2026-06', salary: 1000),
+    );
+    await expenses.put(
+      'may-dinner',
+      _cashExpense(
+        id: 'may-dinner',
+        name: 'May dinner',
+        amount: 120,
+        date: DateTime(2026, 5, 30),
+      ),
+    );
+
+    final splitRepository = SplitRepository();
+    await splitRepository.createSplit(
+      expenseId: 'may-dinner',
+      totalAmount: 120,
+      participants: [
+        SplitParticipantModel(
+          id: '',
+          splitId: '',
+          name: 'Me',
+          amount: 60,
+          isSlipPayer: true,
+        ),
+        SplitParticipantModel(id: '', splitId: '', name: 'Friend', amount: 60),
+      ],
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    // Calculated carry-over is 880; the user types 900 instead (+20 adjustment).
+    await BalanceRepository().setCarryOverForMonth('2026-06', 900);
+    expect(balances.get('2026-06')!.carryOver, 900);
+    expect(balances.get('2026-06')!.carryOverAdjustment, 20);
+
+    final friend = HiveStorage.splitParticipantsBoxRef.values
+        .firstWhere((p) => p.name == 'Friend');
+    await splitRepository.markParticipantAsPaid(
+      friend.id,
+      paidAt: DateTime(2026, 6, 2),
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    // The repaid 60 lands on top of the manual +20: 940 calculated + 20 = 960.
+    expect(balances.get('2026-06')!.carryOver, 960);
+    expect(balances.get('2026-06')!.carryOverAdjustment, 20);
+
+    // Clearing the override returns the month to the calculated value.
+    await BalanceRepository().clearCarryOverAdjustment('2026-06');
+    expect(balances.get('2026-06')!.carryOver, 940);
+  });
+
+  test('overspend rolls forward as negative carry-over', () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put('2026-05', MonthlyBalanceModel(id: '2026-05', salary: 100));
+    await balances.put('2026-06', MonthlyBalanceModel(id: '2026-06', salary: 100));
+    await expenses.put(
+      'overspend',
+      _cashExpense(
+        id: 'overspend',
+        name: 'Overspend',
+        amount: 150,
+        date: DateTime(2026, 5, 4),
+      ),
+    );
+
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    expect(balances.get('2026-05')!.remainingBalance, -50);
+    expect(balances.get('2026-06')!.carryOver, -50);
+    expect(balances.get('2026-06')!.remainingBalance, 50);
+  });
+
+  test('carry-over passes through a month with no balance row', () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put('2026-05', MonthlyBalanceModel(id: '2026-05', salary: 500));
+    await balances.put('2026-07', MonthlyBalanceModel(id: '2026-07', salary: 500));
+    await expenses.put(
+      'may',
+      _cashExpense(
+        id: 'may',
+        name: 'May',
+        amount: 100,
+        date: DateTime(2026, 5, 4),
+      ),
+    );
+
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    // June never existed and must not be synthesised.
+    expect(balances.get('2026-06'), isNull);
+    expect(balances.get('2026-07')!.carryOver, 400);
+  });
+
+  test('the earliest month keeps its carry-over as an opening balance',
+      () async {
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put(
+      '2026-05',
+      MonthlyBalanceModel(
+        id: '2026-05',
+        salary: 1000,
+        carryOverAdjustment: 250,
+      ),
+    );
+
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    expect(balances.get('2026-05')!.carryOver, 250);
+  });
+
+  test('reconcile is idempotent', () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put('2026-05', MonthlyBalanceModel(id: '2026-05', salary: 1000));
+    await balances.put('2026-06', MonthlyBalanceModel(id: '2026-06', salary: 1000));
+    await expenses.put(
+      'visa-may-paid-june',
+      _expense(
+        id: 'visa-may-paid-june',
+        name: 'Card',
+        amount: 200,
+        date: DateTime(2026, 5, 20),
+        repaymentStatus: 'paid',
+        repaymentDate: DateTime(2026, 6, 3),
+      ),
+    );
+
+    await ExpenseRepository().reconcileMonthlyExpenses();
+    final first = balances.values.map((b) => b.toMap()).toList();
+    await ExpenseRepository().reconcileMonthlyExpenses();
+    final second = balances.values.map((b) => b.toMap()).toList();
+
+    expect(second, equals(first));
+  });
+
+  test('adding an expense rebuilds the carry-over chain without a reconcile',
+      () async {
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put('2026-05', MonthlyBalanceModel(id: '2026-05', salary: 1000));
+    await balances.put('2026-06', MonthlyBalanceModel(id: '2026-06', salary: 1000));
+    await ExpenseRepository().reconcileMonthlyExpenses();
+    expect(balances.get('2026-06')!.carryOver, 1000);
+
+    await ExpenseRepository().addExpense(
+      _cashExpense(
+        id: 'ignored',
+        name: 'May cash',
+        amount: 50,
+        date: DateTime(2026, 5, 9),
+      ),
+    );
+
+    // The incremental path must chain too, not wait for the next restart.
+    expect(balances.get('2026-05')!.totalExpenses, 50);
+    expect(balances.get('2026-06')!.carryOver, 950);
+  });
+
+  test('recreating a split preserves participant identity and settlement',
+      () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+    final participants = HiveStorage.splitParticipantsBoxRef;
+
+    await balances.put('2026-05', MonthlyBalanceModel(id: '2026-05', salary: 1000));
+    await expenses.put(
+      'may-dinner',
+      _cashExpense(
+        id: 'may-dinner',
+        name: 'May dinner',
+        amount: 120,
+        date: DateTime(2026, 5, 30),
+      ),
+    );
+
+    final splitRepository = SplitRepository();
+    await splitRepository.createSplit(
+      expenseId: 'may-dinner',
+      totalAmount: 120,
+      participants: [
+        SplitParticipantModel(
+          id: '',
+          splitId: '',
+          name: 'Me',
+          amount: 60,
+          isSlipPayer: true,
+        ),
+        SplitParticipantModel(id: '', splitId: '', name: 'Friend', amount: 60),
+      ],
+    );
+    final friend =
+        participants.values.firstWhere((p) => p.name == 'Friend');
+    await splitRepository.markParticipantAsPaid(
+      friend.id,
+      paidAt: DateTime(2026, 6, 2),
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+    expect(balances.get('2026-05')!.totalExpenses, 60);
+
+    // The edit flow deletes and recreates the split, passing the stored
+    // participants back in.
+    final stored = participants.values
+        .map((p) => SplitParticipantModel(
+              id: p.id,
+              splitId: '',
+              name: p.name,
+              amount: p.amount,
+              isSlipPayer: p.isSlipPayer,
+              isPaid: p.isPaid,
+              paidAt: p.paidAt,
+            ))
+        .toList();
+    await splitRepository.deleteSplitByExpenseId('may-dinner');
+    await splitRepository.createSplit(
+      expenseId: 'may-dinner',
+      totalAmount: 120,
+      participants: stored,
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+
+    final rebuiltFriend =
+        participants.values.firstWhere((p) => p.name == 'Friend');
+    expect(rebuiltFriend.id, friend.id);
+    expect(rebuiltFriend.paidAt, DateTime(2026, 6, 2));
+    // The settlement must survive: without it May jumps back to the full 120.
+    expect(balances.get('2026-05')!.totalExpenses, 60);
+  });
+
+  test('editing a paid credit expense keeps it paid in its repayment month',
+      () async {
+    final expenses = HiveStorage.expensesBoxRef;
+    final balances = HiveStorage.monthlyBalanceBoxRef;
+
+    await balances.put('2026-06', MonthlyBalanceModel(id: '2026-06', salary: 1000));
+    await expenses.put(
+      'visa-paid',
+      _expense(
+        id: 'visa-paid',
+        name: 'Card',
+        amount: 100,
+        date: DateTime(2026, 5, 20),
+        repaymentStatus: 'paid',
+        repaymentDate: DateTime(2026, 6, 3),
+      ),
+    );
+    await ExpenseRepository().reconcileMonthlyExpenses();
+    expect(balances.get('2026-06')!.totalExpenses, 100);
+
+    final renamed = expenses.get('visa-paid')!.copyWith(name: 'Card renamed');
+    await ExpenseRepository().updateExpense(renamed);
+
+    expect(expenses.get('visa-paid')!.repaymentStatus, 'paid');
+    expect(expenses.get('visa-paid')!.repaymentDate, DateTime(2026, 6, 3));
+    expect(balances.get('2026-06')!.totalExpenses, 100);
   });
 }
 

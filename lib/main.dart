@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/datasources/hive_storage.dart';
 import 'data/repositories/expense_repository.dart';
+import 'data/services/balance_migration.dart';
+import 'presentation/providers/migration_notice_provider.dart';
 import 'app.dart';
 
 void main() {
@@ -19,14 +21,14 @@ void main() {
   );
 }
 
-class _AppWithSplash extends StatefulWidget {
+class _AppWithSplash extends ConsumerStatefulWidget {
   const _AppWithSplash();
 
   @override
-  State<_AppWithSplash> createState() => _AppWithSplashState();
+  ConsumerState<_AppWithSplash> createState() => _AppWithSplashState();
 }
 
-class _AppWithSplashState extends State<_AppWithSplash> {
+class _AppWithSplashState extends ConsumerState<_AppWithSplash> {
   bool _initialized = false;
   String? _error;
 
@@ -42,8 +44,12 @@ class _AppWithSplashState extends State<_AppWithSplash> {
       _error = null;
     });
 
+    BalanceMigrationResult migration = const BalanceMigrationResult();
     try {
       await HiveStorage.init();
+      // Strictly before the first reconcile: the chain rebuild would otherwise
+      // zero the earliest month's carry-over, leaving nothing to seed from.
+      migration = await BalanceMigration.runIfNeeded();
       await ExpenseRepository().reconcileMonthlyExpenses();
       await SharedPreferences.getInstance();
     } catch (e) {
@@ -52,6 +58,12 @@ class _AppWithSplashState extends State<_AppWithSplash> {
       return;
     }
     if (!mounted) return;
+
+    if (migration.migrated) {
+      ref.read(migrationNoticeProvider.notifier).state = migration.backupError == null
+          ? 'Balances recalculated. A backup was saved to your Downloads folder.'
+          : 'Balances recalculated, but the automatic backup could not be saved.';
+    }
     setState(() => _initialized = true);
   }
 

@@ -124,6 +124,7 @@ class ExportImportData {
             'salary': _toDouble(map['salary']),
             'carryOver': _toDouble(map['carryOver']),
             'totalExpenses': _toDouble(map['totalExpenses']),
+            'carryOverAdjustment': _toDouble(map['carryOverAdjustment']),
           }),
         );
       }
@@ -289,10 +290,23 @@ class ExportImportData {
 
     // Monthly Balances sheet
     final balSheet = excel['MonthlyBalances'];
-    balSheet.appendRow(['ID', 'Salary', 'CarryOver', 'TotalExpenses']);
+    // CarryOverAdjustment is appended last: this sheet is read positionally, so
+    // inserting a column would silently shift every field after it.
+    balSheet.appendRow([
+      'ID',
+      'Salary',
+      'CarryOver',
+      'TotalExpenses',
+      'CarryOverAdjustment',
+    ]);
     for (final b in allData['monthlyBalances'] as List) {
-      balSheet.appendRow(
-          [b['id'], b['salary'], b['carryOver'], b['totalExpenses']]);
+      balSheet.appendRow([
+        b['id'],
+        b['salary'],
+        b['carryOver'],
+        b['totalExpenses'],
+        b['carryOverAdjustment'],
+      ]);
     }
 
     // Expense Splits sheet
@@ -425,6 +439,10 @@ class ExportImportData {
             'carryOver': double.tryParse(row[2]?.value?.toString() ?? '0') ?? 0,
             'totalExpenses':
                 double.tryParse(row[3]?.value?.toString() ?? '0') ?? 0,
+            // Absent in backups taken before this column existed.
+            'carryOverAdjustment': row.length > 4
+                ? double.tryParse(row[4]?.value?.toString() ?? '0') ?? 0
+                : 0.0,
           }),
         );
       }
@@ -491,6 +509,7 @@ class ExportImportData {
 
   // ── Pick a file for import ──
   static Future<String?> pickImportFile() async {
+    // file_picker 11 made FilePicker static; `.platform` no longer exists.
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json', 'xlsx'],
