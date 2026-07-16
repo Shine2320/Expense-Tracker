@@ -21,7 +21,7 @@ flutter run
 Requires Flutter ≥ 3.16 (Dart ≥ 3.4), JDK 17, and an Android 13+ (API 33) device or emulator.
 
 ```bash
-flutter test      # 24 tests — run from the repo root
+flutter test      # 34 tests — run from the repo root
 flutter analyze   # clean
 ```
 

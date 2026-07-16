@@ -279,6 +279,15 @@ Text(amount, style: MoneyText.medium(context)
 </table>
 </div>
 
+<div class="note">
+  <strong>In a list, use the indexed variants</strong>
+  Both methods above linear-scan the split and participant boxes for a single expense. Called per row inside <code>build()</code>, that's O(n·m) on every rebuild. Build the index once and pass it down:
+  <pre style="margin:8px 0 0"><code>final index = expenseNotifier.buildSplitIndex();          // one pass
+final amount = expenseNotifier.countedAmountWith(e, index);
+final owed   = expenseNotifier.netSplitAmountWith(e, index);</code></pre>
+  Don't cache the index on the repository — <code>expenseRepositoryProvider</code> is a plain <code>Provider</code>, so it lives for the whole session and the cache would go stale the moment a split is settled.
+</div>
+
 <div class="warn">
   <strong>These two are not interchangeable</strong>
   <code>getCountedAmount()</code> returns <strong>0</strong> for a pending card expense (it has no accounting date). Use it for a "card due" figure and the screen will always read zero. Use <code>getNetSplitAmount()</code> there instead.
@@ -554,11 +563,18 @@ double carryOverAdjustment;</code></pre>
 <section id="testing">
 <h2 class="sec">Testing</h2>
 
-<p><code>flutter test</code> — 24 tests across two files. Each seeds a temp Hive directory, registers adapters, opens boxes, and tears down.</p>
+<p><code>flutter test</code> — 34 tests across four files. Each seeds a temp Hive directory, registers adapters, opens boxes, and tears down.</p>
 <ul>
-  <li><code>test/expense_credit_card_test.dart</code> — 22 accounting tests, run on the Dart VM.</li>
-  <li><code>test/dashboard_settlement_flow_test.dart</code> — 2 widget tests driving the dashboard end-to-end.</li>
+  <li><code>test/expense_credit_card_test.dart</code> — accounting: credit repayment months, the carry-over chain, splits, soft delete.</li>
+  <li><code>test/legacy_data_upgrade_test.dart</code> — <strong>the upgrade safety net.</strong> Stands in for "months of real data, then install the new build".</li>
+  <li><code>test/dashboard_settlement_flow_test.dart</code> — drives the reported bug through the real dashboard.</li>
+  <li><code>test/month_summary_labels_test.dart</code> — what the month summary actually renders.</li>
 </ul>
+
+<div class="danger">
+  <strong>Never let the upgrade tests rot</strong>
+  Every other test starts from an empty box — the one case that cannot lose data. <code>legacy_data_upgrade_test.dart</code> is the only thing standing between a schema change and someone's real financial history. Its central assertion was sabotage-checked: remove the migration and it fails with <code>Expected: &lt;8000&gt; Actual: &lt;0.0&gt;</code>, i.e. the opening balance silently zeroed.
+</div>
 
 <div class="warn">
   <strong>Two rules for widget tests here, both learned the hard way</strong>
@@ -577,8 +593,8 @@ double carryOverAdjustment;</code></pre>
 </ul>
 
 <div class="warn">
-  <strong>Three tests assert on source text, not behaviour</strong>
-  The first three read screen <code>.dart</code> files off disk and assert on substrings (e.g. <code>expect(summarySource, isNot(contains('+ expense.amount')))</code>). They break on a reformat and pass on a rename, they depend on the CWD being the repo root, and they give false confidence that the UI is covered. Replace them with behavioural tests as those screens change; don't extend the pattern.
+  <strong>Don't assert on source text</strong>
+  Three tests here used to read screen <code>.dart</code> files off disk and grep them (<code>expect(summarySource, contains('getCountedAmount(expense)'))</code>). A rename that made the code faster and changed nothing a user sees broke all three — while they would have passed happily on a screen that rendered nothing at all. They're gone, replaced by widget tests that assert what's on screen. Don't reintroduce the pattern.
 </div>
 
 <div class="ok">
