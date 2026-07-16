@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/money_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart' as utils;
 import '../../../data/models/category_model.dart';
@@ -42,6 +43,9 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
 
     final monthExpenses =
         expenseNotifier.getAccountingExpensesByMonth(_selectedMonth);
+    // Dart normalises month 0 to December of the previous year.
+    final previousMonth =
+        DateTime(_selectedMonth.year, _selectedMonth.month - 1);
 
     final categoryExpenses = <String, double>{};
     for (final expense in monthExpenses) {
@@ -111,7 +115,12 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
-                    label: 'Carry-over',
+                    // Name the source month: this figure now moves when an
+                    // earlier month is corrected, so it needs to say where it
+                    // came from and whether the user has adjusted it.
+                    label: balance.carryOverAdjustment != 0
+                        ? 'Carry-over from ${utils.DateUtils.formatMonthYear(previousMonth)} (adjusted)'
+                        : 'Carry-over from ${utils.DateUtils.formatMonthYear(previousMonth)}',
                     value:
                         CurrencyFormatter.format(balance.carryOver, currency),
                   ),
@@ -122,16 +131,15 @@ class _MonthSummaryScreenState extends ConsumerState<MonthSummaryScreen> {
                     label: 'Total Expenses',
                     value: CurrencyFormatter.format(
                         balance.totalExpenses, currency),
-                    valueColor: Theme.of(context).colorScheme.error,
+                    valueColor: context.money.negative,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _SummaryRow(
                     label: 'Remaining',
                     value: CurrencyFormatter.format(
                         balance.remainingBalance, currency),
-                    valueColor: balance.remainingBalance >= 0
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.error,
+                    valueColor:
+                        context.money.forBalance(balance.remainingBalance),
                     isBold: true,
                   ),
                 ],

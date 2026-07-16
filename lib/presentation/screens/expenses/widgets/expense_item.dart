@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/constants/app_spacing.dart';
+import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/theme/money_colors.dart';
 import '../../../../../core/utils/currency_formatter.dart';
 import '../../../../../core/utils/date_utils.dart' as utils;
 import '../../../../data/models/category_model.dart';
@@ -17,7 +19,10 @@ class ExpenseItem extends ConsumerWidget {
   final VoidCallback? onRestore;
   final VoidCallback? onPermanentDelete;
   final double? amountOverride;
-  final String? statusLabel;
+
+  /// Zero or more badges explaining how this expense is being counted, e.g. a
+  /// credit card paid this month that is also a settled split.
+  final List<String> statusLabels;
   final String? detailText;
 
   const ExpenseItem({
@@ -30,7 +35,7 @@ class ExpenseItem extends ConsumerWidget {
     this.onRestore,
     this.onPermanentDelete,
     this.amountOverride,
-    this.statusLabel,
+    this.statusLabels = const [],
     this.detailText,
   });
 
@@ -61,7 +66,7 @@ class ExpenseItem extends ConsumerWidget {
       },
       child: Card(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        color: isDeleted ? colorScheme.surfaceVariant.withOpacity(0.3) : null,
+        color: isDeleted ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
         child: ListTile(
           leading: Opacity(
             opacity: isDeleted ? 0.4 : 1.0,
@@ -83,7 +88,7 @@ class ExpenseItem extends ConsumerWidget {
               fontWeight: FontWeight.w600,
               decoration: isDeleted ? TextDecoration.lineThrough : null,
               color: isDeleted
-                  ? colorScheme.onSurface.withOpacity(0.4)
+                  ? colorScheme.onSurface.withValues(alpha: 0.4)
                   : colorScheme.onSurface,
             ),
           ),
@@ -104,18 +109,19 @@ class ExpenseItem extends ConsumerWidget {
                   color: colorScheme.tertiaryContainer,
                   onColor: colorScheme.onTertiaryContainer,
                 ),
-              if (statusLabel != null)
-                _StatusChip(
-                  label: statusLabel!,
+              ...statusLabels.map(
+                (label) => _StatusChip(
+                  label: label,
                   color: colorScheme.secondaryContainer,
                   onColor: colorScheme.onSecondaryContainer,
                 ),
+              ),
               Text(
                 '${category.name} - ${utils.DateUtils.formatTime(expense.date)}',
                 style: TextStyle(
                   fontSize: 12,
                   color: isDeleted
-                      ? colorScheme.onSurface.withOpacity(0.3)
+                      ? colorScheme.onSurface.withValues(alpha: 0.3)
                       : colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -125,7 +131,7 @@ class ExpenseItem extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 12,
                     color: isDeleted
-                        ? colorScheme.onSurface.withOpacity(0.3)
+                        ? colorScheme.onSurface.withValues(alpha: 0.3)
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -136,12 +142,13 @@ class ExpenseItem extends ConsumerWidget {
               amountOverride ?? expense.amount,
               currency,
             ),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+            style: MoneyText.medium(context).copyWith(
               color: isDeleted
-                  ? colorScheme.onSurface.withOpacity(0.3)
-                  : colorScheme.error,
-              fontSize: 16,
+                  ? colorScheme.onSurface.withValues(alpha: 0.3)
+                  // Pending card spend is owed, not yet gone: amber, not red.
+                  : expense.isCreditCard && expense.isPending
+                      ? context.money.pending
+                      : context.money.negative,
               decoration: isDeleted ? TextDecoration.lineThrough : null,
             ),
           ),

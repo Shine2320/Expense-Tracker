@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/money_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart' as utils;
 import '../../providers/calendar_provider.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/currency_provider.dart';
 import '../../../data/models/currency_config.dart';
+import '../../../data/models/expense_model.dart';
 import 'widgets/day_expense_sheet.dart';
 
 class CalendarScreen extends ConsumerWidget {
@@ -19,18 +22,10 @@ class CalendarScreen extends ConsumerWidget {
     final focusedDay = ref.watch(calendarProvider);
     ref.watch(expensesProvider);
     final currency = ref.watch(currencyProvider);
-    final expensesForMonth =
-        ref.read(expensesProvider.notifier).getExpensesByMonth(focusedDay);
-
-    final daysWithExpenses = <DateTime, List<dynamic>>{};
-    for (final expense in expensesForMonth) {
-      final day =
-          DateTime(expense.date.year, expense.date.month, expense.date.day);
-      if (!daysWithExpenses.containsKey(day)) {
-        daysWithExpenses[day] = [];
-      }
-      daysWithExpenses[day]!.add(expense);
-    }
+    // Bucketed by accounting date so the calendar agrees with the balance card.
+    final daysWithExpenses = ref
+        .read(expensesProvider.notifier)
+        .getAccountingDaysWithExpenses(focusedDay);
 
     return Scaffold(
       appBar: AppBar(
@@ -51,7 +46,16 @@ class CalendarScreen extends ConsumerWidget {
               onDaySelected: (selectedDay, focusedDay) {
                 ref.read(calendarProvider.notifier).setSelectedDay(selectedDay);
                 ref.read(calendarProvider.notifier).setFocusedDay(focusedDay);
-                _showDayExpenses(context, ref, selectedDay);
+                _showDayExpenses(
+                  context,
+                  selectedDay,
+                  daysWithExpenses[DateTime(
+                        selectedDay.year,
+                        selectedDay.month,
+                        selectedDay.day,
+                      )] ??
+                      const [],
+                );
               },
               onPageChanged: (focusedDay) {
                 ref.read(calendarProvider.notifier).setFocusedDay(focusedDay);
@@ -104,8 +108,13 @@ class CalendarScreen extends ConsumerWidget {
     );
   }
 
-  void _showDayExpenses(BuildContext context, WidgetRef ref, DateTime day) {
-    final expenses = ref.read(expensesProvider.notifier).getExpensesByDate(day);
+  /// Takes the already-bucketed list rather than re-querying by expense date,
+  /// which would open a sheet that disagrees with the marker that was tapped.
+  void _showDayExpenses(
+    BuildContext context,
+    DateTime day,
+    List<ExpenseModel> expenses,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -119,7 +128,7 @@ class CalendarScreen extends ConsumerWidget {
 
 class _MonthSummary extends ConsumerWidget {
   final DateTime month;
-  final Map<DateTime, List<dynamic>> daysWithExpenses;
+  final Map<DateTime, List<ExpenseModel>> daysWithExpenses;
   final CurrencyConfig currency;
 
   const _MonthSummary({
@@ -130,10 +139,12 @@ class _MonthSummary extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final expenseNotifier = ref.read(expensesProvider.notifier);
     double totalMonthExpenses = 0;
     for (final expenses in daysWithExpenses.values) {
       for (final expense in expenses) {
-        totalMonthExpenses += expense.amount;
+        // Counted, not gross: a split you were partly repaid for costs less.
+        totalMonthExpenses += expenseNotifier.getCountedAmount(expense);
       }
     }
 
@@ -146,28 +157,28 @@ class _MonthSummary extends ConsumerWidget {
         children: [
           Text(
             utils.DateUtils.formatMonthYear(month),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               Expanded(
                 child: _SummaryItem(
-                  label: 'Total Expenses',
+                  label: 'Counted this month',
                   value: CurrencyFormatter.format(totalMonthExpenses, currency),
-                  color: Theme.of(context).colorScheme.error,
+                  container: context.money.negativeContainer,
+                  onContainer: context.money.onNegativeContainer,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _SummaryItem(
-                  label: 'Days with Expenses',
+                  label: 'Days with expenses',
                   value: '$daysWithExpenseCount',
-                  color: Theme.of(context).colorScheme.primary,
+                  container:
+                      Theme.of(context).colorScheme.secondaryContainer,
+                  onContainer:
+                      Theme.of(context).colorScheme.onSecondaryContainer,
                 ),
               ),
             ],
@@ -181,12 +192,14 @@ class _MonthSummary extends ConsumerWidget {
 class _SummaryItem extends StatelessWidget {
   final String label;
   final String value;
-  final Color color;
+  final Color container;
+  final Color onContainer;
 
   const _SummaryItem({
     required this.label,
     required this.value,
-    required this.color,
+    required this.container,
+    required this.onContainer,
   });
 
   @override
@@ -194,26 +207,26 @@ class _SummaryItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: container,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-            ),
+            label.toUpperCase(),
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: onContainer),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: MoneyText.large(context).copyWith(color: onContainer),
             ),
           ),
         ],
