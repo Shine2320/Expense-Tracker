@@ -1,16 +1,8 @@
-buildscript {
-    ext.kotlin_version = '1.9.0'
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath "com.android.tools.build:gradle:8.6.0"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
-
+// AGP and the Kotlin plugin are declared in settings.gradle's plugins block. The
+// legacy buildscript classpath is gone on purpose: it competed with the KGP that
+// Flutter's own flutter_tools included build puts on the shared plugin classpath,
+// and the older one won — leaving plugins that use the KGP 2.x compilerOptions DSL
+// (shared_preferences_android) failing to configure.
 allprojects {
     repositories {
         google()

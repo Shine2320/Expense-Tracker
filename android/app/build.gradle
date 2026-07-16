@@ -24,8 +24,11 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.expense_tracker"
-    compileSdkVersion 34
-    ndkVersion "26.1.10909125"
+    // compileSdk only governs which APIs compile, not runtime behaviour: file_picker
+    // and flutter_plugin_android_lifecycle compile against 36, androidx.core needs 35+.
+    // targetSdk stays at 34 — raising that opts into new runtime behaviour.
+    compileSdk 36
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
