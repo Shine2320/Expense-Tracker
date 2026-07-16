@@ -21,13 +21,14 @@ class MonthlyBalanceModelAdapter extends TypeAdapter<MonthlyBalanceModel> {
       salary: fields[1] as double,
       carryOver: fields[2] as double,
       totalExpenses: fields[3] as double,
+      carryOverAdjustment: fields[4] == null ? 0.0 : fields[4] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, MonthlyBalanceModel obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -35,7 +36,9 @@ class MonthlyBalanceModelAdapter extends TypeAdapter<MonthlyBalanceModel> {
       ..writeByte(2)
       ..write(obj.carryOver)
       ..writeByte(3)
-      ..write(obj.totalExpenses);
+      ..write(obj.totalExpenses)
+      ..writeByte(4)
+      ..write(obj.carryOverAdjustment);
   }
 
   @override
