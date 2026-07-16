@@ -46,7 +46,8 @@ keytool -genkey -v -keystore H:\upload-keystore.jks -keyalg RSA -keysize 2048 -v
 ```
 
 ## Step 4: Create Signing Config
-Create `android/key.properties`:
+`android/app/build.gradle` already reads the keystore — there is no Gradle edit
+left to make. Create `android/key.properties` and the release build picks it up:
 ```
 storePassword=<your-password>
 keyPassword=<your-password>
@@ -54,34 +55,16 @@ keyAlias=upload
 storeFile=H:\\upload-keystore.jks
 ```
 
-**Update `android/app/build.gradle`** to use the keystore:
-Add before `android {`:
-```gradle
-def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
-if (keystorePropertiesFile.exists()) {
-    keystorePropertiesFile.withReader('UTF-8') { reader ->
-        keystoreProperties.load(reader)
-    }
-}
-```
+`key.properties`, `*.jks` and `*.keystore` are gitignored — never commit them.
 
-Change release signingConfig from `debug` to:
-```gradle
-signingConfig signingConfigs.release
+**Without** this file the release build falls back to the **debug key** so a
+plain checkout still builds. That fallback only warns under
+`flutter build --verbose`, so confirm what actually signed the artifact before
+uploading:
 ```
-
-Add before `buildTypes`:
-```gradle
-signingConfigs {
-    release {
-        keyAlias keystoreProperties['keyAlias']
-        keyPassword keystoreProperties['keyPassword']
-        storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-        storePassword keystoreProperties['storePassword']
-    }
-}
+apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk
 ```
+`CN=Android Debug` means it is debug-signed and Play will reject it.
 
 ## Step 5: Build Release App Bundle (Recommended)
 ```
